@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum CompanyStatus {
+  active
+  deactive
+}
+
+enum UserRole {
+  super_admin
+  super_user
+  auditor
+  operator
+  department_head
+}
+
+enum ReviewStatus {
+  pending
+  reviewed
+  requiresAttention
+  needFurtherReview
+}
+
+enum SessionStatus {
+  active
+  revoked
+}
+
+model Company {
+  id               String        @id @default(uuid()) @db.Char(36)
+  name             String        @db.VarChar(255)
+  industry         String?       @db.VarChar(100)
+  employeeCount    Int?
+  status           CompanyStatus @default(active)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  users       User[]
+  employees   Employee[]
+  auditLogs   AuditLog[]
+  sessions    UserSession[]
+
+  @@map("companies")
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Char(36)
+  companyId    String     @db.Char(36)
+  employeeId   String?    @db.Char(36)
+  fullName     String     @db.VarChar(255)
+  email        String     @unique @db.VarChar(255)
+  passwordHash String     @db.VarChar(255)
+  role         UserRole
+  isActive     Boolean    @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  company      Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee     Employee?  @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  sessions     UserSession[]
+  auditLogs    AuditLog[]
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@map("users")
+}
+
+model Employee {
+  id                String    @id @default(uuid()) @db.Char(36)
+  companyId         String    @db.Char(36)
+  fullName          String    @db.VarChar(255)
+  phoneNumber       String    @db.VarChar(50)
+  department        String?   @db.VarChar(100)
+  position          String?   @db.VarChar(100)
+  avgMonthlyExpense Decimal?  @db.Decimal(15, 2)
+  externalRef       String?   @db.VarChar(100)
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users             User[]
+
+  @@index([companyId])
+  @@unique([companyId, phoneNumber])
+  @@map("employees")
+}
+
+model UserSession {
+  id               String        @id @default(uuid()) @db.Char(36)
+  companyId        String        @db.Char(36)
+  userId           String        @db.Char(36)
+  refreshTokenHash String        @db.VarChar(255)
+  ipAddress        String?       @db.VarChar(100)
+  userAgent        String?       @db.VarChar(500)
+  status           SessionStatus @default(active)
+  lastUsedAt       DateTime?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  company          Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([userId])
+  @@map("user_sessions")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Char(36)
+  companyId  String   @db.Char(36)
+  userId     String   @db.Char(36)
+  action     String   @db.VarChar(100)
+  targetType String   @db.VarChar(50)
+  targetId   String?  @db.Char(36)
+  note       String?  @db.Text
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([userId])
+  @@map("audit_logs")
+}

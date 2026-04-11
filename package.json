@@ -1,32 +1,53 @@
 {
   "name": "fraud-detection-platform",
   "version": "1.0.0",
-  "main": "src/server.js",
+  "description": "",
+  "main": "dist/main.js",
   "scripts": {
-    "dev": "nodemon src/server.js",
-    "start": "node src/server.js",
-    "make:migrate": "sequelize-cli migration:generate --name",
-    "db:migrate": "sequelize-cli db:migrate",
-    "db:migrate:undo": "sequelize-cli db:migrate:undo",
-    "db:migrate:undo:all": "sequelize-cli db:migrate:undo:all"
+    "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LGTM-Build/BE-Fraud-Detection-Platform.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/LGTM-Build/BE-Fraud-Detection-Platform/issues"
+  },
+  "homepage": "https://github.com/LGTM-Build/BE-Fraud-Detection-Platform#readme",
   "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "connect-session-sequelize": "^8.0.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^5.1.0",
-    "express-session": "^1.18.1",
+    "@prisma/client": "^6.19.3",
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.1",
+    "express": "^5.2.1",
     "helmet": "^8.1.0",
-    "mysql2": "^3.14.0",
-    "passport": "^0.7.0",
-    "passport-local": "^1.0.0",
-    "sequelize": "^6.37.7",
-    "sequelize-cli": "^6.6.3",
-    "uuid": "^11.1.0",
-    "zod": "^3.25.76"
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.1",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^25.6.0",
+    "@types/uuid": "^10.0.0",
+    "prisma": "^6.19.3",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^6.0.2"
   }
 }
