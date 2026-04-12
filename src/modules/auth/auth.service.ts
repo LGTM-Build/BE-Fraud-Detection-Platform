@@ -2,10 +2,19 @@ import { prisma } from "../../lib/prisma";
 import { AppError } from "../../core/errors/app-error";
 import {
   comparePassword,
+  compareToken,
   hashPassword,
   hashToken,
 } from "../../core/utils/hashing";
-import { signAccessToken, signRefreshToken } from "../../core/utils/jwt";
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+} from "../../core/utils/jwt";
+
+function getRefreshTokenExpiryDate() {
+  return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+}
 
 export class AuthService {
   static async registerCompany(input: {
@@ -56,9 +65,10 @@ export class AuthService {
           companyId: company.id,
           userId: user.id,
           refreshTokenHash: "TEMP",
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          expiresAt: getRefreshTokenExpiryDate(),
           ipAddress: input.ipAddress,
           userAgent: input.userAgent,
+          lastUsedAt: new Date(),
         },
       });
 
@@ -126,7 +136,7 @@ export class AuthService {
         companyId: user.companyId,
         userId: user.id,
         refreshTokenHash: "TEMP",
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: getRefreshTokenExpiryDate(),
         ipAddress: input.ipAddress,
         userAgent: input.userAgent,
         lastUsedAt: new Date(),
@@ -166,6 +176,175 @@ export class AuthService {
       user,
       accessToken,
       refreshToken,
+    };
+  }
+
+  static async profile(userId: string, companyId: string) {
+    const user = await prisma.user.findFirst({
+      where: {
+        id: userId,
+        companyId,
+      },
+      select: {
+        id: true,
+        companyId: true,
+        employeeId: true,
+        fullName: true,
+        email: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError("User not found", 404, "USER_NOT_FOUND");
+    }
+
+    return user;
+  }
+
+  static async refreshToken(input: {
+    refreshToken: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }) {
+    let payload: ReturnType<typeof verifyRefreshToken>;
+
+    try {
+      payload = verifyRefreshToken(input.refreshToken);
+    } catch (error) {
+      throw new AppError(
+        "Invalid or expired refresh token",
+        401,
+        "INVALID_REFRESH_TOKEN",
+      );
+    }
+
+    if (payload.type !== "refresh") {
+      throw new AppError("Invalid token type", 401, "INVALID_REFRESH_TOKEN");
+    }
+
+    const session = await prisma.userSession.findUnique({
+      where: { id: payload.sid },
+      include: { user: true },
+    });
+
+    if (!session) {
+      throw new AppError("Session not found", 401, "SESSION_NOT_FOUND");
+    }
+
+    if (session.status !== "active" || session.revokedAt) {
+      throw new AppError("Session has been revoked", 401, "SESSION_REVOKED");
+    }
+
+    if (session.expiresAt.getTime() < Date.now()) {
+      throw new AppError("Refresh token expired", 401, "REFRESH_TOKEN_EXPIRED");
+    }
+
+    const tokenMatch = await compareToken(
+      input.refreshToken,
+      session.refreshTokenHash,
+    );
+
+    if (!tokenMatch) {
+      throw new AppError(
+        "Refresh token mismatch",
+        401,
+        "REFRESH_TOKEN_MISMATCH",
+      );
+    }
+
+    if (!session.user.isActive) {
+      throw new AppError("User is inactive", 403, "USER_INACTIVE");
+    }
+
+    const newAccessToken = signAccessToken({
+      sub: session.user.id,
+      cid: session.user.companyId,
+      role: session.user.role,
+      sid: session.id,
+    });
+
+    const newRefreshToken = signRefreshToken({
+      sub: session.user.id,
+      cid: session.user.companyId,
+      sid: session.id,
+    });
+
+    const newRefreshTokenHash = await hashToken(newRefreshToken);
+
+    await prisma.userSession.update({
+      where: { id: session.id },
+      data: {
+        refreshTokenHash: newRefreshTokenHash,
+        lastUsedAt: new Date(),
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+        expiresAt: getRefreshTokenExpiryDate(),
+      },
+    });
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+      user: {
+        id: session.user.id,
+        companyId: session.user.companyId,
+        fullName: session.user.fullName,
+        email: session.user.email,
+        role: session.user.role,
+        isActive: session.user.isActive,
+      },
+    };
+  }
+
+  static async logout(input: { refreshToken: string }) {
+    let payload: ReturnType<typeof verifyRefreshToken>;
+
+    try {
+      payload = verifyRefreshToken(input.refreshToken);
+    } catch {
+      throw new AppError(
+        "Invalid or expired refresh token",
+        401,
+        "INVALID_REFRESH_TOKEN",
+      );
+    }
+
+    const session = await prisma.userSession.findUnique({
+      where: { id: payload.sid },
+    });
+
+    if (!session) {
+      throw new AppError("Session not found", 404, "SESSION_NOT_FOUND");
+    }
+
+    const tokenMatch = await compareToken(
+      input.refreshToken,
+      session.refreshTokenHash,
+    );
+
+    if (!tokenMatch) {
+      throw new AppError(
+        "Refresh token mismatch",
+        401,
+        "REFRESH_TOKEN_MISMATCH",
+      );
+    }
+
+    await prisma.userSession.update({
+      where: { id: session.id },
+      data: {
+        status: "revoked",
+        revokedAt: new Date(),
+      },
+    });
+
+    return {
+      message: "Logout successful",
     };
   }
 }
