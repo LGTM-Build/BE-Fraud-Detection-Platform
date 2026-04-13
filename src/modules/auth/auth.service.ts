@@ -11,6 +11,8 @@ import {
   signRefreshToken,
   verifyRefreshToken,
 } from "../../core/utils/jwt";
+import { AuditLogService } from "../audit-logs/audit-log.service";
+import { meta } from "zod/v4/core";
 
 function getRefreshTokenExpiryDate() {
   return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -92,6 +94,21 @@ export class AuthService {
         data: { refreshTokenHash },
       });
 
+      await tx.auditLog.create({
+        data: {
+          companyId: company.id,
+          userId: user.id,
+          action: "register_company",
+          targetType: "company",
+          targetId: company.id,
+          note: `Company ${company.name} registered with user ${user.email}`,
+          metadata: {
+            email: user.email,
+            role: user.role,
+          },
+        },
+      });
+
       return {
         company,
         user,
@@ -169,6 +186,19 @@ export class AuthService {
       where: { id: user.id },
       data: {
         lastLoginAt: new Date(),
+      },
+    });
+
+    await AuditLogService.create({
+      companyId: user.companyId,
+      userId: user.id,
+      action: "login",
+      targetType: "auth",
+      targetId: user.id,
+      note: `User ${user.email} logged in`,
+      metadata: {
+        email: user.email,
+        role: user.role,
       },
     });
 
