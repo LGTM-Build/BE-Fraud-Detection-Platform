@@ -1,165 +1,418 @@
 {
-  "info": {
-    "_postman_id": "aef30dd1-3e13-40cc-8ed3-3cf2fc1dbc40",
-    "name": "AI Fraud Detection Vendor and Expense",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "52616616",
-    "_collection_link": "https://sabrinaaska-works-364207.postman.co/workspace/LGTM~c87f10ab-c087-4c67-80de-34c037064db9/collection/52616616-aef30dd1-3e13-40cc-8ed3-3cf2fc1dbc40?action=share&source=collection_link&creator=52616616"
-  },
-  "item": [
-    {
-      "name": "Auth",
-      "item": [
-        {
-          "name": "Register Company",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.response.to.have.status(200);\r",
-                  "\r",
-                  "var json = pm.response.json(); // Define json variable to hold the JSON response\r",
-                  "\r",
-                  "pm.environment.set(\"access_token\", json.data.accessToken);\r",
-                  "pm.environment.set(\"refresh_token\", json.data.refreshToken);\r",
-                  "pm.environment.set(\"user_id\", json.data.user.id);\r",
-                  "pm.environment.set(\"user_name\", json.data.user.fullName);\r",
-                  "pm.environment.set(\"user_email\", json.data.user.email);\r",
-                  "pm.environment.set(\"company_id\", json.data.user.companyId);\r",
-                  "pm.environment.set(\"role\", json.data.user.role);"
-                ],
-                "type": "text/javascript",
-                "packages": {}
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\r\n    \"companyName\" : \"LGTM\",\r\n    \"industry\": \"Software House\",\r\n    \"employeeCount\": 40,\r\n    \"fullName\": \"Latifa Salsabila\",\r\n    \"email\": \"latifasalsab.works@gmail.com\",\r\n    \"password\": \"secret123\"\r\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/auth/register-company",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "register-company"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Login",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.response.to.have.status(200);",
-                  "",
-                  "var json = pm.response.json(); // Define json variable to hold the JSON response",
-                  "",
-                  "pm.environment.set(\"access_token\", json.data.accessToken);",
-                  "pm.environment.set(\"refresh_token\", json.data.refreshToken);",
-                  "pm.environment.set(\"user_id\", json.data.user.id);",
-                  "pm.environment.set(\"user_name\", json.data.user.fullName);",
-                  "pm.environment.set(\"user_email\", json.data.user.email);",
-                  "pm.environment.set(\"company_id\", json.data.user.companyId);",
-                  "pm.environment.set(\"role\", json.data.user.role);"
-                ],
-                "type": "text/javascript",
-                "packages": {}
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\r\n    \"email\": \"latifasalsab.works@gmail.com\",\r\n    \"password\": \"secret123\"\r\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/auth/login",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "login"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Refresh Token",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const json = pm.response.json();\r",
-                  "\r",
-                  "pm.environment.set(\"access_token\", json.data.accessToken);\r",
-                  "pm.environment.set(\"refresh_token\", json.data.refreshToken);"
-                ],
-                "type": "text/javascript",
-                "packages": {}
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\r\n  \"refreshToken\": \"{{refresh_token}}\"\r\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/auth/refresh",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "refresh"]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Profile",
-      "item": [
-        {
-          "name": "Profile",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/profile",
-              "host": ["{{base_url}}"],
-              "path": ["profile"]
-            }
-          },
-          "response": []
-        }
-      ]
-    }
-  ]
+	"info": {
+		"_postman_id": "aef30dd1-3e13-40cc-8ed3-3cf2fc1dbc40",
+		"name": "AI Fraud Detection Vendor and Expense",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "52616616",
+		"_collection_link": "https://sabrinaaska-works-364207.postman.co/workspace/LGTM~c87f10ab-c087-4c67-80de-34c037064db9/collection/52616616-aef30dd1-3e13-40cc-8ed3-3cf2fc1dbc40?action=share&source=collection_link&creator=52616616"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Register Company",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.response.to.have.status(200);\r",
+									"\r",
+									"var json = pm.response.json(); // Define json variable to hold the JSON response\r",
+									"\r",
+									"pm.environment.set(\"access_token\", json.data.accessToken);\r",
+									"pm.environment.set(\"refresh_token\", json.data.refreshToken);\r",
+									"pm.environment.set(\"user_id\", json.data.user.id);\r",
+									"pm.environment.set(\"user_name\", json.data.user.fullName);\r",
+									"pm.environment.set(\"user_email\", json.data.user.email);\r",
+									"pm.environment.set(\"company_id\", json.data.user.companyId);\r",
+									"pm.environment.set(\"role\", json.data.user.role);"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"companyName\" : \"LGTM\",\r\n    \"industry\": \"Software House\",\r\n    \"employeeCount\": 40,\r\n    \"fullName\": \"Latifa Salsabila\",\r\n    \"email\": \"latifasalsab.works@gmail.com\",\r\n    \"password\": \"secret123\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/register-company",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"register-company"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.response.to.have.status(200);",
+									"",
+									"var json = pm.response.json(); // Define json variable to hold the JSON response",
+									"",
+									"pm.environment.set(\"access_token\", json.data.accessToken);",
+									"pm.environment.set(\"refresh_token\", json.data.refreshToken);",
+									"pm.environment.set(\"user_id\", json.data.user.id);",
+									"pm.environment.set(\"user_name\", json.data.user.fullName);",
+									"pm.environment.set(\"user_email\", json.data.user.email);",
+									"pm.environment.set(\"company_id\", json.data.user.companyId);",
+									"pm.environment.set(\"role\", json.data.user.role);"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\": \"latifasalsab.works@gmail.com\",\r\n    \"password\": \"secret123\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const json = pm.response.json();\r",
+									"\r",
+									"pm.environment.set(\"access_token\", json.data.accessToken);\r",
+									"pm.environment.set(\"refresh_token\", json.data.refreshToken);"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"refreshToken\": \"{{refresh_token}}\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/refresh",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"refresh"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.environment.unset(\"access_token\");\r",
+									"pm.environment.unset(\"refresh_token\");\r",
+									"pm.environment.unset(\"user_id\");\r",
+									"pm.environment.unset(\"user_name\");\r",
+									"pm.environment.unset(\"user_email\");\r",
+									"pm.environment.unset(\"company_id\");\r",
+									"pm.environment.unset(\"role\");"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"refreshToken\": \"{{refresh_token}}\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"logout"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Profile",
+			"item": [
+				{
+					"name": "Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/profile",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"profile"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "List User Under Company",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"employeeId\": null,\r\n  \"fullName\": \"Sabrina Aska\",\r\n  \"email\": \"sabrina@example.com\",\r\n  \"password\": \"secret123\",\r\n  \"role\": \"super_user\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/users",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Detail User Under Company",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/users/:id_user",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"users",
+								":id_user"
+							],
+							"variable": [
+								{
+									"key": "id_user",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add user Under Company",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"employeeId\": null,\r\n  \"fullName\": \"Sabrina Aska\",\r\n  \"email\": \"aska@gmail.com\",\r\n  \"password\": \"secret123\",\r\n  \"role\": \"auditor\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/users",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Edit User Under Company",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"fullName\": \"Sabrina Aska Updated\",\r\n  \"role\": \"operator\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/users/:id_user",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"users",
+								":id_user"
+							],
+							"variable": [
+								{
+									"key": "id_user",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Change isActive",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/users/:id_user/toggle-active",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"users",
+								":id_user",
+								"toggle-active"
+							],
+							"variable": [
+								{
+									"key": "id_user",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
 }

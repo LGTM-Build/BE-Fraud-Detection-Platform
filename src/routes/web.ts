@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { AuthController } from "../modules/auth/auth.controller";
+import { UserController } from "../modules/users/user.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/require-role.middleware";
 
@@ -13,6 +14,42 @@ router.post("/auth/logout", AuthController.logout);
 
 // Profile
 router.get("/profile", authMiddleware, AuthController.profile);
+
+// User
+router.get(
+  "/api/users",
+  authMiddleware,
+  requireRole(["super_admin", "super_user"]),
+  UserController.list,
+);
+
+router.get(
+  "/api/users/:id",
+  authMiddleware,
+  requireRole(["super_admin", "super_user"]),
+  UserController.detail,
+);
+
+router.post(
+  "/api/users",
+  authMiddleware,
+  requireRole(["super_admin", "super_user"]),
+  UserController.create,
+);
+
+router.put(
+  "/api/users/:id",
+  authMiddleware,
+  requireRole(["super_admin", "super_user"]),
+  UserController.update,
+);
+
+router.patch(
+  "/api/users/:id/toggle-active",
+  authMiddleware,
+  requireRole(["super_admin", "super_user"]),
+  UserController.toggleActive,
+);
 
 // Example protected route
 // router.get(

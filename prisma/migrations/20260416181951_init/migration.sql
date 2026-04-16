@@ -4,7 +4,7 @@ CREATE TABLE `companies` (
     `name` VARCHAR(255) NOT NULL,
     `industry` VARCHAR(100) NULL,
     `employeeCount` INTEGER NULL,
-    `status` ENUM('active', 'deactive') NOT NULL DEFAULT 'active',
+    `status` ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
