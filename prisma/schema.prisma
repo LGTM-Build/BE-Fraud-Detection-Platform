@@ -38,6 +38,12 @@ enum SessionStatus {
   revoked
 }
 
+enum VendorStatus {
+  active
+  inactive
+  blacklisted
+}
+
 model Company {
   id               String        @id @default(uuid()) @db.Char(36)
   name             String        @db.VarChar(255)
@@ -51,6 +57,7 @@ model Company {
   employees   Employee[]
   auditLogs   AuditLog[]
   sessions    UserSession[]
+  vendors     Vendor[]
 
   @@map("companies")
 }
@@ -138,4 +145,26 @@ model AuditLog {
   @@index([companyId])
   @@index([userId])
   @@map("audit_logs")
+}
+
+model Vendor {
+  id                     String       @id @default(uuid()) @db.Char(36)
+  companyId              String       @db.Char(36)
+  vendorName             String       @db.VarChar(255)
+  vendorRegistrationDate DateTime?
+  vendorBankAccount      String?      @db.VarChar(100)
+  vendorAddress          String?      @db.VarChar(255)
+  vendorContact          String?      @db.VarChar(255)
+  externalRef            String?      @db.VarChar(100)
+  metadata               Json?
+  isActive               Boolean      @default(true)
+  status                 VendorStatus @default(active)
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  company                Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@unique([companyId, externalRef])
+  @@map("vendors")
 }
