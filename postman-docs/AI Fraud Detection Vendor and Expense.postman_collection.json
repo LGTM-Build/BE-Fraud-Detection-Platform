@@ -224,11 +224,12 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/profile",
+							"raw": "{{base_url}}/api/profile",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
+								"api",
 								"profile"
 							]
 						}
@@ -413,6 +414,347 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Employees",
+			"item": [
+				{
+					"name": "List Employees",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/employees",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"employees"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Employee",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"fullName\": \"Ahmad Riadi\",\r\n  \"phoneNumber\": \"08123456889\",\r\n  \"department\": \"IT\",\r\n  \"position\": \"Manager\",\r\n  \"avgMonthlyExpense\": 2500000,\r\n  \"externalRef\": \"0686.11.2011.399\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/employees",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"employees"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Detail Employee",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/employees/:id_employee",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"employees",
+								":id_employee"
+							],
+							"variable": [
+								{
+									"key": "id_employee",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Edit Employee",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"department\": \"IT\"\r\n    //\"phoneNumber\": \"085142689089\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/employees/29a65d87-0738-496d-92b0-5de276987b86",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"employees",
+								"29a65d87-0738-496d-92b0-5de276987b86"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Vendor",
+			"item": [
+				{
+					"name": "List Vendors",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/vendors",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"vendors"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Vendor",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"vendorName\": \"PT Sumber Makmur\",\r\n  \"vendorRegistrationDate\": \"2025-02-10T00:00:00.000Z\",\r\n  \"vendorBankAccount\": \"1234567890\",\r\n  \"vendorAddress\": \"Jakarta Selatan\",\r\n  \"vendorContact\": \"Andi - 081299998888\",\r\n  \"externalRef\": \"VENDOR-ERP-001\",\r\n  \"status\": \"active\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/vendors",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"vendors"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Edit Vendor",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"vendorContact\": \"Andi - 081299998850\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/vendors/:id_vendor",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"vendors",
+								":id_vendor"
+							],
+							"variable": [
+								{
+									"key": "id_vendor",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Change Status Vendor",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"status\": \"blacklisted\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/vendors/:id_vendor/status",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"vendors",
+								":id_vendor",
+								"status"
+							],
+							"variable": [
+								{
+									"key": "id_vendor",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Detail Vendor",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/vendors/:id_vendor",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"vendors",
+								":id_vendor"
+							],
+							"variable": [
+								{
+									"key": "id_vendor",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Audit Logs",
+			"item": [
+				{
+					"name": "List Audit Logs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/audit-logs?page=1&limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"audit-logs"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Audit logs mempunyai filter pada params :\n\n- action\n    \n- targetType\n    \n- userId"
 		}
 	]
 }
