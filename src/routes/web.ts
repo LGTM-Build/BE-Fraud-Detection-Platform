@@ -6,6 +6,7 @@ import { requireRole } from "../middlewares/require-role.middleware";
 import { EmployeeController } from "../modules/employees/employee.controller";
 import { VendorController } from "../modules/vendors/vendor.controller";
 import { AuditLogController } from "../modules/audit-logs/audit-log.controller";
+import { ProcurementController } from "../modules/procurement/procurement.controller";
 
 const router = Router();
 
@@ -130,6 +131,42 @@ router.get(
   authMiddleware,
   requireRole(["super_admin", "super_user", "auditor"]),
   AuditLogController.list,
+);
+
+// Procurement Transactions
+router.get(
+  "/api/procurement-transactions",
+  authMiddleware,
+  requireRole(["super_admin", "super_user", "auditor"]),
+  ProcurementController.list,
+);
+
+router.get(
+  "/api/procurement-transactions/:id",
+  authMiddleware,
+  requireRole(["super_admin", "super_user", "auditor"]),
+  ProcurementController.detail,
+);
+
+router.post(
+  "/api/procurement-transactions",
+  authMiddleware,
+  requireRole(["super_admin", "super_user"]),
+  ProcurementController.create,
+);
+
+router.put(
+  "/api/procurement-transactions/:id",
+  authMiddleware,
+  requireRole(["super_admin", "admin"]),
+  ProcurementController.update,
+);
+
+router.patch(
+  "/api/procurement-transactions/:id/status",
+  authMiddleware,
+  requireRole(["super_admin", "admin", "auditor"]),
+  ProcurementController.updateStatus,
 );
 
 export default router;

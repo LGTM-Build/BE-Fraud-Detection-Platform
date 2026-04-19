@@ -14,23 +14,23 @@ datasource db {
 }
 
 enum CompanyStatus {
-  active
-  inactive
+  active   @map("Active")
+  inactive @map("Inactive")
 }
 
 enum UserRole {
-  super_admin
-  super_user
-  auditor
-  operator
-  department_head
+  super_admin     @map("Super Admin")
+  super_user      @map("Super User")
+  auditor         @map("Auditor")
+  operator        @map("Operator")
+  department_head @map("Department Head")
 }
 
 enum ReviewStatus {
-  pending
-  reviewed
-  requiresAttention
-  needFurtherReview
+  pending             @map("Pending")
+  reviewed            @map("Reviewed")
+  requires_attention  @map("Requires Attention")
+  need_further_review @map("Need Further Review")
 }
 
 enum SessionStatus {
@@ -39,46 +39,69 @@ enum SessionStatus {
 }
 
 enum VendorStatus {
-  active
-  inactive
-  blacklisted
+  active      @map("Active")
+  inactive    @map("Inactive")
+  blacklisted @map("Blacklisted")
+}
+
+enum ProcurementMethod {
+  pengadaan_langsung @map("Pengadaan Langsung")
+  tender_terbuka     @map("Tender Terbuka")
+  tender_tertutup    @map("tender Tertutup")
+  e_purchasing       @map("E-Purchasing")
+  rfp                @map("RFP")
+  lainnya            @map("Lainnya")
+}
+
+enum FraudAnalysisType {
+  supervised @map("Supervised")
+  anomaly    @map("Anomaly")
+}
+
+enum FraudAnalysisStatus {
+  pending    @map("Pending")
+  processing @map("Processing")
+  completed  @map("Completed")
+  failed     @map("Failed")
 }
 
 model Company {
-  id               String        @id @default(uuid()) @db.Char(36)
-  name             String        @db.VarChar(255)
-  industry         String?       @db.VarChar(100)
-  employeeCount    Int?
-  status           CompanyStatus @default(active)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id            String        @id @default(uuid()) @db.Char(36)
+  name          String        @db.VarChar(255)
+  industry      String?       @db.VarChar(100)
+  employeeCount Int?
+  status        CompanyStatus @default(active)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  users       User[]
-  employees   Employee[]
-  auditLogs   AuditLog[]
-  sessions    UserSession[]
-  vendors     Vendor[]
+  users                   User[]
+  employees               Employee[]
+  auditLogs               AuditLog[]
+  sessions                UserSession[]
+  vendors                 Vendor[]
+  procurementTransactions ProcurementTransaction[]
+  fraudAnalysisResults    FraudAnalysisResult[]
 
   @@map("companies")
 }
 
 model User {
-  id           String     @id @default(uuid()) @db.Char(36)
-  companyId    String     @db.Char(36)
-  employeeId   String?    @db.Char(36)
-  fullName     String     @db.VarChar(255)
-  email        String     @unique @db.VarChar(255)
-  passwordHash String     @db.VarChar(255)
+  id           String    @id @default(uuid()) @db.Char(36)
+  companyId    String    @db.Char(36)
+  employeeId   String?   @db.Char(36)
+  fullName     String    @db.VarChar(255)
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @db.VarChar(255)
   role         UserRole
-  isActive     Boolean    @default(true)
+  isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  company      Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employee     Employee?  @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  sessions     UserSession[]
-  auditLogs    AuditLog[]
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee  Employee?     @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  sessions  UserSession[]
+  auditLogs AuditLog[]
 
   @@index([companyId])
   @@index([employeeId])
@@ -86,23 +109,24 @@ model User {
 }
 
 model Employee {
-  id                String    @id @default(uuid()) @db.Char(36)
-  companyId         String    @db.Char(36)
-  fullName          String    @db.VarChar(255)
-  phoneNumber       String    @db.VarChar(50)
-  department        String?   @db.VarChar(100)
-  position          String?   @db.VarChar(100)
-  avgMonthlyExpense Decimal?  @db.Decimal(15, 2)
-  externalRef       String?   @db.VarChar(100)
+  id                String   @id @default(uuid()) @db.Char(36)
+  companyId         String   @db.Char(36)
+  fullName          String   @db.VarChar(255)
+  phoneNumber       String   @db.VarChar(50)
+  department        String?  @db.VarChar(100)
+  position          String?  @db.VarChar(100)
+  avgMonthlyExpense Decimal? @db.Decimal(15, 2)
+  externalRef       String?  @db.VarChar(100)
   metadata          Json?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  users             User[]
+  company                 Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users                   User[]
+  procurementTransactions ProcurementTransaction[]
 
-  @@index([companyId])
   @@unique([companyId, phoneNumber])
+  @@index([companyId])
   @@map("employees")
 }
 
@@ -120,8 +144,8 @@ model UserSession {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  company          Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([userId])
@@ -139,8 +163,8 @@ model AuditLog {
   metadata   Json?
   createdAt  DateTime @default(now())
 
-  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([userId])
@@ -162,9 +186,92 @@ model Vendor {
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
 
-  company                Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company                 Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  procurementTransactions ProcurementTransaction[]
+
+  @@unique([companyId, externalRef])
+  @@index([companyId])
+  @@map("vendors")
+}
+
+model ProcurementTransaction {
+  id         String  @id @default(uuid()) @db.Char(36)
+  companyId  String  @db.Char(36)
+  vendorId   String  @db.Char(36)
+  employeeId String? @db.Char(36)
+
+  purchaseId      String?           @db.VarChar(100)
+  poNumber        String?           @db.VarChar(100)
+  purchaseDate    DateTime
+  itemId          String?           @db.VarChar(100)
+  itemDescription String?           @db.Text
+  quantity        Decimal?          @db.Decimal(15, 2)
+  unitPrice       Decimal?          @db.Decimal(15, 2)
+  amountTotal     Decimal           @db.Decimal(15, 2)
+  department      String?           @db.VarChar(100)
+  method          ProcurementMethod @default(lainnya)
+
+  approvalDate  DateTime?
+  invoiceNumber String?   @db.VarChar(100)
+  invoiceDate   DateTime?
+  location      String?   @db.VarChar(100)
+  contractId    String?   @db.VarChar(100)
+  contractDate  DateTime?
+  paymentDate   DateTime?
+
+  status       ReviewStatus @default(pending)
+  reviewerNote String?      @db.Text
+  reviewedBy   String?      @db.Char(36)
+  reviewedAt   DateTime?
+
+  importBatchId String? @db.Char(36)
+  metadata      Json?
+
+  createdBy String   @db.Char(36)
+  updatedBy String?  @db.Char(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  fraudResults FraudAnalysisResult[]
 
   @@index([companyId])
-  @@unique([companyId, externalRef])
-  @@map("vendors")
+  @@index([vendorId])
+  @@index([employeeId])
+  @@index([status])
+  @@index([purchaseDate])
+  @@index([invoiceNumber])
+  @@map("procurement_transactions")
+}
+
+model FraudAnalysisResult {
+  id            String @id @default(uuid()) @db.Char(36)
+  companyId     String @db.Char(36)
+  procurementId String @db.Char(36)
+
+  analysisType FraudAnalysisType
+  status       FraudAnalysisStatus @default(pending)
+
+  isFraud     Boolean?
+  fraudScore  Float?
+  flags       Json?
+  features    Json?
+  rawResponse Json?
+
+  requestedAt DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company     Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  procurement ProcurementTransaction @relation(fields: [procurementId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([procurementId])
+  @@index([analysisType])
+  @@index([status])
+  @@map("fraud_analysis_results")
 }
