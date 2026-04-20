@@ -17,7 +17,7 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.response.to.have.status(200);\r",
+									"pm.response.to.have.status(201);\r",
 									"\r",
 									"var json = pm.response.json(); // Define json variable to hold the JSON response\r",
 									"\r",
@@ -221,6 +221,11 @@
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}",
 								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
 							}
 						],
 						"url": {
@@ -285,6 +290,11 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
 								"type": "text"
 							}
 						],
@@ -390,6 +400,11 @@
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}",
 								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
 							}
 						],
 						"url": {
@@ -426,6 +441,11 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
 								"type": "text"
 							}
 						],
@@ -483,6 +503,11 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
 								"type": "text"
 							}
 						],
@@ -553,6 +578,11 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
 								"type": "text"
 							}
 						],
@@ -692,6 +722,11 @@
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}",
 								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
 							}
 						],
 						"url": {
@@ -728,6 +763,11 @@
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}",
 								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
 							}
 						],
 						"url": {
@@ -755,6 +795,201 @@
 				}
 			],
 			"description": "Audit logs mempunyai filter pada params :\n\n- action\n    \n- targetType\n    \n- userId"
+		},
+		{
+			"name": "Procurement Transactions",
+			"item": [
+				{
+					"name": "List Procurement Transaction",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/procurement-transactions?page=1&limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"procurement-transactions"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Procurement Transaction",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"vendorId\": \"b89d9a18-c9bc-4813-8a11-104fee3f47d5\",\r\n  \"employeeId\": \"a1b21421-f23b-473f-80ff-c26f357d717c\",\r\n  \"purchaseId\": \"PUR-2026-001\",\r\n  \"poNumber\": \"PO-2026-001\",\r\n  \"purchaseDate\": \"2026-04-19T10:00:00.000Z\",\r\n  \"itemId\": \"ITEM-001\",\r\n  \"itemDescription\": \"Laptop procurement\",\r\n  \"quantity\": 2,\r\n  \"unitPrice\": 15000000,\r\n  \"amountTotal\": 30000000,\r\n  \"department\": \"IT\",\r\n  \"method\": \"pengadaan_langsung\",\r\n  \"approvalDate\": \"2026-04-19T11:00:00.000Z\",\r\n  \"invoiceNumber\": \"INV-2026-001\",\r\n  \"invoiceDate\": \"2026-04-19T12:00:00.000Z\",\r\n  \"location\": \"Jakarta\",\r\n  \"contractId\": \"CTR-2026-001\",\r\n  \"contractDate\": \"2026-04-18T09:00:00.000Z\",\r\n  \"paymentDate\": \"2026-04-20T09:00:00.000Z\",\r\n  \"metadata\": {\r\n    \"source\": \"manual_input\",\r\n    \"notes\": \"urgent purchase\"\r\n  }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/procurement-transactions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"procurement-transactions"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Edit Procurement Transactions",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"department\": \"Finance\",\r\n  \"location\": \"Jakarta\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/procurement-transactions/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"procurement-transactions",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Edit Procurement Transaction Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"status\": \"requires_attention\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/procurement-transactions/:id/status",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"procurement-transactions",
+								":id",
+								"status"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Detail Procurement Transaction",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/procurement-transactions/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"procurement-transactions",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Get **Procurement List** filter:\n\n- status: \\[pending, reviewed, requires_attention, need_further_review\\]\n    \n- department\n    \n- Page & limit"
 		}
 	]
 }
