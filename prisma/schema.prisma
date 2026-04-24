@@ -55,7 +55,7 @@ enum ProcurementMethod {
 
 enum FraudAnalysisType {
   supervised    @map("Supervised")
-  Anomaly       @map("Anomaly")
+  anomaly       @map("Anomaly")
 }
 
 enum FraudAnalysisStatus {
