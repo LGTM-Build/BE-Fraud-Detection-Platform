@@ -253,7 +253,7 @@ model FraudAnalysisResult {
   procurementId String @db.Char(36)
 
   analysisType FraudAnalysisType
-  status       FraudAnalysisStatus @default(pending)
+  status       FraudAnalysisStatus @default(Pending)
 
   isFraud     Boolean?
   fraudScore  Float?
