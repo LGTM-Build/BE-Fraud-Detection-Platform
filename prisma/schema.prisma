@@ -54,15 +54,15 @@ enum ProcurementMethod {
 }
 
 enum FraudAnalysisType {
-  supervised @map("Supervised")
-  anomaly    @map("Anomaly")
+  Supervised 
+  Anomaly    
 }
 
 enum FraudAnalysisStatus {
-  pending    @map("Pending")
-  processing @map("Processing")
-  completed  @map("Completed")
-  failed     @map("Failed")
+  Pending
+  Processing
+  Completed
+  Failed
 }
 
 model Company {

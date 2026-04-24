@@ -2,11 +2,13 @@ import { Router } from "express";
 import { AuthController } from "../modules/auth/auth.controller";
 import { UserController } from "../modules/users/user.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
+import { internalApiKeyMiddleware } from "../middlewares/internal-api-key.middleware";
 import { requireRole } from "../middlewares/require-role.middleware";
 import { EmployeeController } from "../modules/employees/employee.controller";
 import { VendorController } from "../modules/vendors/vendor.controller";
 import { AuditLogController } from "../modules/audit-logs/audit-log.controller";
 import { ProcurementController } from "../modules/procurement/procurement.controller";
+import { FraudIntegrationController } from "../modules/integrations/fraud/fraud.controller";
 
 const router = Router();
 
@@ -167,6 +169,13 @@ router.patch(
   authMiddleware,
   requireRole(["super_admin", "admin", "auditor"]),
   ProcurementController.updateStatus,
+);
+
+// Fraud Results From Py
+router.post(
+  "/api/internal/fraud-results/batch",
+  internalApiKeyMiddleware,
+  FraudIntegrationController.insertBatch,
 );
 
 export default router;
