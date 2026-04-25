@@ -26,6 +26,7 @@
   "homepage": "https://github.com/LGTM-Build/BE-Fraud-Detection-Platform#readme",
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "axios": "^1.15.2",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../core/errors/app-error";
 import { AuditLogService } from "../audit-logs/audit-log.service";
+import { FraudDispatchService } from "../integrations/fraud/fraud-dispatch.service";
 
 const toPrismaJson = (
   value: unknown,
@@ -238,7 +239,23 @@ export class ProcurementService {
       },
     });
 
-    return procurement;
+    let fraudDispatch: any = null;
+    let fraudDispatchError: string | null = null;
+
+    try {
+      fraudDispatch = await FraudDispatchService.dispatchProcurement(
+        procurement.id,
+      );
+    } catch (error: any) {
+      fraudDispatchError =
+        error.message ?? "Failed to dispatch to fraud service";
+    }
+
+    return {
+      procurement,
+      fraudDispatch,
+      fraudDispatchError,
+    };
   }
 
   static async update(

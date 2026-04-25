@@ -173,6 +173,12 @@ router.patch(
 
 // Fraud Results From Py
 router.post(
+  "/api/internal/fraud-results",
+  internalApiKeyMiddleware,
+  FraudIntegrationController.insertSingle,
+);
+
+router.post(
   "/api/internal/fraud-results/batch",
   internalApiKeyMiddleware,
   FraudIntegrationController.insertBatch,
