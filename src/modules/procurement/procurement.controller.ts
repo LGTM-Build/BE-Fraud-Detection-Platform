@@ -7,6 +7,7 @@ import {
   updateProcurementStatusSchema,
 } from "./procurement.schema";
 import { ProcurementService } from "./procurement.service";
+import { FraudDispatchService } from "../integrations/fraud/fraud-dispatch.service";
 
 export class ProcurementController {
   static async list(req: Request, res: Response, next: NextFunction) {
@@ -133,6 +134,31 @@ export class ProcurementController {
       res.status(200).json({
         success: true,
         message: "Procurement status updated successfully",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async dispatchFraud(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) {
+        throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
+      }
+
+      const result = await FraudDispatchService.dispatchProcurementForCompany(
+        req.auth.companyId,
+        req.params.id as string,
+        req.auth.userId,
+        "manual_dispatch",
+        "supervised",
+      );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Procurement transaction dispatched to fraud service successfully",
         data: result,
       });
     } catch (error) {

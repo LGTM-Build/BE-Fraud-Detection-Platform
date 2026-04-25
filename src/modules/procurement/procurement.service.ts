@@ -88,7 +88,50 @@ const vendorStatusLabelMap: Record<string, string> = {
   blacklisted: "Blacklisted",
 };
 
-function mapProcurementResponse(item: any) {
+type ProcurementListItem = {
+  id: string;
+  purchaseId: string | null;
+  poNumber: string | null;
+  purchaseDate: Date;
+  itemId: string | null;
+  itemDescription: string | null;
+  department: string | null;
+  method: ProcurementMethod;
+  amountTotal: unknown;
+  status: ReviewStatus;
+  reviewerNote: string | null;
+  reviewedBy: string | null;
+  reviewedAt: Date | null;
+  invoiceNumber: string | null;
+  invoiceDate: Date | null;
+  contractId: string | null;
+  contractDate: Date | null;
+  paymentDate: Date | null;
+  location: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  vendor: {
+    id: string;
+    vendorName: string;
+    vendorBankAccount: string | null;
+    vendorRegistrationDate: Date | null;
+    vendorAddress: string | null;
+    vendorContact: string | null;
+    status: string;
+  };
+  employee: {
+    id: string;
+    fullName: string;
+    department: string | null;
+    position: string | null;
+  } | null;
+  fraudResults?: Array<{
+    fraudScore: number | null;
+    flags: unknown;
+  }>;
+};
+
+function mapProcurementResponse(item: ProcurementListItem) {
   const latestFraud = item.fraudResults?.[0];
   const flags = latestFraud?.flags as
     | string[]
@@ -162,6 +205,17 @@ function mapProcurementResponse(item: any) {
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   };
+}
+
+type StatusCountItem = {
+  status: ReviewStatus;
+  _count: {
+    status: number;
+  };
+};
+
+function getStatusCount(items: StatusCountItem[], status: ReviewStatus) {
+  return items.find((x) => x.status === status)?._count.status ?? 0;
 }
 
 export class ProcurementService {
@@ -245,6 +299,8 @@ export class ProcurementService {
     try {
       fraudDispatch = await FraudDispatchService.dispatchProcurement(
         procurement.id,
+        "create_procurement",
+        "supervised",
       );
     } catch (error: any) {
       fraudDispatchError =
@@ -540,34 +596,36 @@ export class ProcurementService {
 
     const mappedItems = items.map(mapProcurementResponse);
 
+    const typedStatusCounts = statusCounts as StatusCountItem[];
+
     const summary = {
-      semua: statusCounts.reduce(
-        (acc: number, curr) => acc + curr._count.status,
+      semua: typedStatusCounts.reduce(
+        (acc, curr) => acc + curr._count.status,
         0,
       ),
       byStatus: {
-        pending:
-          statusCounts.find((x) => x.status === "pending")?._count.status ?? 0,
-        reviewed:
-          statusCounts.find((x) => x.status === "reviewed")?._count.status ?? 0,
-        requires_attention:
-          statusCounts.find((x) => x.status === "requires_attention")?._count
-            .status ?? 0,
-        need_further_review:
-          statusCounts.find((x) => x.status === "need_further_review")?._count
-            .status ?? 0,
+        pending: getStatusCount(typedStatusCounts, "pending"),
+        reviewed: getStatusCount(typedStatusCounts, "reviewed"),
+        requires_attention: getStatusCount(
+          typedStatusCounts,
+          "requires_attention",
+        ),
+        need_further_review: getStatusCount(
+          typedStatusCounts,
+          "need_further_review",
+        ),
       },
       byStatusLabel: {
-        Pending:
-          statusCounts.find((x) => x.status === "pending")?._count.status ?? 0,
-        Reviewed:
-          statusCounts.find((x) => x.status === "reviewed")?._count.status ?? 0,
-        "Requires Attention":
-          statusCounts.find((x) => x.status === "requires_attention")?._count
-            .status ?? 0,
-        "Need Further Review":
-          statusCounts.find((x) => x.status === "need_further_review")?._count
-            .status ?? 0,
+        Pending: getStatusCount(typedStatusCounts, "pending"),
+        Reviewed: getStatusCount(typedStatusCounts, "reviewed"),
+        "Requires Attention": getStatusCount(
+          typedStatusCounts,
+          "requires_attention",
+        ),
+        "Need Further Review": getStatusCount(
+          typedStatusCounts,
+          "need_further_review",
+        ),
       },
     };
 

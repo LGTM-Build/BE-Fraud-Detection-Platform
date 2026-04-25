@@ -12,7 +12,6 @@ import {
   verifyRefreshToken,
 } from "../../core/utils/jwt";
 import { AuditLogService } from "../audit-logs/audit-log.service";
-import { meta } from "zod/v4/core";
 
 function getRefreshTokenExpiryDate() {
   return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);

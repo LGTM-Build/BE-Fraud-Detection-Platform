@@ -37,31 +37,36 @@ function mapReasonsToFlags(reasons: string[] = []) {
     const lower = reason.toLowerCase();
 
     if (lower.includes("vendor sangat baru")) flags.new_vendor = 1;
-    if (lower.includes("approval date mendahului purchase date"))
+    if (lower.includes("approval date mendahului purchase date")) {
       flags.approval_before_purchase = 1;
-    if (lower.includes("payment date mendahului invoice date"))
+    }
+    if (lower.includes("payment date mendahului invoice date")) {
       flags.payment_before_invoice = 1;
+    }
     if (lower.includes("invoice duplikat")) flags.duplicate_invoice = 1;
     if (lower.includes("employee id tidak dikenali"))
       flags.unknown_employee = 1;
-    if (lower.includes("nominal") && lower.includes("median kategori"))
+    if (lower.includes("nominal") && lower.includes("median kategori")) {
       flags.amount_outlier = 1;
+    }
     if (lower.includes("transaksi burst")) flags.high_frequency = 1;
   }
 
   return flags;
 }
 
-function riskLevelToReviewStatus(riskLevel?: string) {
+function riskLevelToProcurementStatus(
+  riskLevel?: string,
+): "pending" | "reviewed" | "requires_attention" | "need_further_review" {
   switch (riskLevel) {
     case "HIGH":
-      return "high_alert";
+      return "requires_attention";
     case "MEDIUM":
-      return "pending_review";
+      return "need_further_review";
     case "LOW":
       return "pending";
     case "SAFE":
-      return "auto_approved";
+      return "reviewed";
     default:
       return "pending";
   }
@@ -161,12 +166,12 @@ export class FraudIntegrationService {
       },
     });
 
-    const nextReviewStatus = riskLevelToReviewStatus(input.riskLevel);
+    const nextStatus = riskLevelToProcurementStatus(input.riskLevel);
 
     await prisma.procurementTransaction.update({
       where: { id: procurement.id },
       data: {
-        status: nextReviewStatus as any,
+        status: nextStatus,
       },
     });
 
@@ -200,22 +205,7 @@ export class FraudIntegrationService {
     analysisType: "supervised" | "anomaly";
     generatedAt?: string;
     modelMeta?: Record<string, any>;
-    samplePredictions: Array<{
-      purchaseId: string;
-      employeeId?: string;
-      department?: string;
-      transactionType: string;
-      amountTotal?: number;
-      category?: string;
-      purchaseDate?: string;
-      vendorName?: string;
-      scores?: Record<string, number>;
-      riskLevel?: "HIGH" | "MEDIUM" | "LOW" | "SAFE";
-      predictedFraud?: boolean;
-      actualFraud?: boolean;
-      correct?: boolean;
-      reasons?: string[];
-    }>;
+    samplePredictions: PredictionItem[];
   }) {
     const procurementItems = input.samplePredictions.filter(
       (item) => item.transactionType?.toLowerCase() === "procurement",
@@ -280,12 +270,12 @@ export class FraudIntegrationService {
         },
       });
 
-      const nextReviewStatus = riskLevelToReviewStatus(item.riskLevel);
+      const nextStatus = riskLevelToProcurementStatus(item.riskLevel);
 
       await prisma.procurementTransaction.update({
         where: { id: procurement.id },
         data: {
-          status: nextReviewStatus as any,
+          status: nextStatus,
         },
       });
 

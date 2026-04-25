@@ -12,6 +12,13 @@ import { FraudIntegrationController } from "../modules/integrations/fraud/fraud.
 
 const router = Router();
 
+router.get("/health-check", (_req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "API is running",
+  });
+});
+
 // Auth
 router.post("/auth/register-company", AuthController.registerCompany);
 router.post("/auth/login", AuthController.login);
@@ -160,18 +167,25 @@ router.post(
 router.put(
   "/api/procurement-transactions/:id",
   authMiddleware,
-  requireRole(["super_admin", "admin"]),
+  requireRole(["super_admin", "super_user"]),
   ProcurementController.update,
 );
 
 router.patch(
   "/api/procurement-transactions/:id/status",
   authMiddleware,
-  requireRole(["super_admin", "admin", "auditor"]),
+  requireRole(["super_admin", "super_user", "auditor"]),
   ProcurementController.updateStatus,
 );
 
-// Fraud Results From Py
+router.post(
+  "/api/procurement-transactions/:id/dispatch-fraud",
+  authMiddleware,
+  requireRole(["super_admin", "super_user", "auditor"]),
+  ProcurementController.dispatchFraud,
+);
+
+// Fraud Results From Python
 router.post(
   "/api/internal/fraud-results",
   internalApiKeyMiddleware,
