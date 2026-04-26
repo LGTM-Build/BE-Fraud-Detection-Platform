@@ -1,14 +1,18 @@
 import { Router } from "express";
-import { AuthController } from "../modules/auth/auth.controller";
-import { UserController } from "../modules/users/user.controller";
+
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { internalApiKeyMiddleware } from "../middlewares/internal-api-key.middleware";
 import { requireRole } from "../middlewares/require-role.middleware";
+import { upload } from "../middlewares/upload.middleware";
+
+import { AuthController } from "../modules/auth/auth.controller";
+import { UserController } from "../modules/users/user.controller";
 import { EmployeeController } from "../modules/employees/employee.controller";
 import { VendorController } from "../modules/vendors/vendor.controller";
 import { AuditLogController } from "../modules/audit-logs/audit-log.controller";
 import { ProcurementController } from "../modules/procurement/procurement.controller";
 import { FraudIntegrationController } from "../modules/integrations/fraud/fraud.controller";
+import { ImportController } from "../modules/imports/import.controller";
 
 const router = Router();
 
@@ -196,6 +200,15 @@ router.post(
   "/api/internal/fraud-results/batch",
   internalApiKeyMiddleware,
   FraudIntegrationController.insertBatch,
+);
+
+// Import Procurement File
+router.post(
+  "/api/imports/procurement",
+  authMiddleware,
+  requireRole(["super_admin", "super_user"]),
+  upload.single("file"),
+  ImportController.importProcurement,
 );
 
 export default router;
