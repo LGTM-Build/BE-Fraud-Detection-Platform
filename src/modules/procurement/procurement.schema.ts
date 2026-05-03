@@ -11,49 +11,38 @@ const procurementMethodEnum = z.enum([
 
 const reviewStatusEnum = z.enum([
   "pending",
-  "reviewed",
-  "requires_attention",
-  "need_further_review",
+  "alert",
+  "high_alert",
+  "auto_approved",
+  "approved",
+  "rejected",
 ]);
 
 export const createProcurementSchema = z.object({
-  vendorId: z.string().uuid(),
   employeeId: z.string().uuid().optional().nullable(),
-
   purchaseId: z.string().max(100).optional().nullable(),
-  poNumber: z.string().max(100).optional().nullable(),
   purchaseDate: z.string().datetime(),
-  itemId: z.string().max(100).optional().nullable(),
-  itemDescription: z.string().optional().nullable(),
-  quantity: z.number().nonnegative().optional().nullable(),
-  unitPrice: z.number().nonnegative().optional().nullable(),
-  amountTotal: z.number().nonnegative(),
+  vendorName: z.string().min(1).max(255),
+  itemDescription: z.string().min(1),
   department: z.string().max(100).optional().nullable(),
-  method: procurementMethodEnum.optional(),
-
-  approvalDate: z.string().datetime().optional().nullable(),
-  invoiceNumber: z.string().max(100).optional().nullable(),
-  invoiceDate: z.string().datetime().optional().nullable(),
-  location: z.string().max(100).optional().nullable(),
-  contractId: z.string().max(100).optional().nullable(),
-  contractDate: z.string().datetime().optional().nullable(),
-  paymentDate: z.string().datetime().optional().nullable(),
-  metadata: z.any().optional().nullable(),
+  amountTotal: z.number().nonnegative(),
+  procurementMethod: procurementMethodEnum.optional(),
 });
 
 export const updateProcurementSchema = createProcurementSchema.partial();
 
-export const updateProcurementStatusSchema = z.object({
-  status: reviewStatusEnum,
-  reviewerNote: z.string().optional().nullable(),
+export const reviewProcurementSchema = z.object({
+  status: z.enum(["approved", "rejected"]),
 });
 
-export const listProcurementQuerySchema = z.object({
+export const listProcurementMonitorQuerySchema = z.object({
   status: reviewStatusEnum.optional(),
+  group: z.enum(["ml_pending", "needs_review", "reviewed"]).optional(),
   department: z.string().optional(),
-  vendorId: z.string().uuid().optional(),
-  minScore: z.coerce.number().optional(),
-  maxScore: z.coerce.number().optional(),
+  searchVendor: z.string().optional(),
+  searchItem: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });

@@ -4,7 +4,7 @@ CREATE TABLE `companies` (
     `name` VARCHAR(255) NOT NULL,
     `industry` VARCHAR(100) NULL,
     `employeeCount` INTEGER NULL,
-    `status` ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+    `status` ENUM('Active', 'Inactive') NOT NULL DEFAULT 'Active',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
@@ -19,7 +19,7 @@ CREATE TABLE `users` (
     `fullName` VARCHAR(255) NOT NULL,
     `email` VARCHAR(255) NOT NULL,
     `passwordHash` VARCHAR(255) NOT NULL,
-    `role` ENUM('super_admin', 'super_user', 'auditor', 'operator', 'department_head') NOT NULL,
+    `role` ENUM('Super Admin', 'Super User', 'Auditor', 'Operator', 'Department Head') NOT NULL,
     `isActive` BOOLEAN NOT NULL DEFAULT true,
     `lastLoginAt` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -39,14 +39,12 @@ CREATE TABLE `employees` (
     `phoneNumber` VARCHAR(50) NOT NULL,
     `department` VARCHAR(100) NULL,
     `position` VARCHAR(100) NULL,
-    `avgMonthlyExpense` DECIMAL(15, 2) NULL,
     `externalRef` VARCHAR(100) NULL,
-    `metadata` JSON NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
     INDEX `employees_companyId_idx`(`companyId`),
-    UNIQUE INDEX `employees_companyId_phoneNumber_key`(`companyId`, `phoneNumber`),
+    UNIQUE INDEX `employees_companyId_externalRef_key`(`companyId`, `externalRef`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -92,19 +90,14 @@ CREATE TABLE `vendors` (
     `id` CHAR(36) NOT NULL,
     `companyId` CHAR(36) NOT NULL,
     `vendorName` VARCHAR(255) NOT NULL,
-    `vendorRegistrationDate` DATETIME(3) NULL,
-    `vendorBankAccount` VARCHAR(100) NULL,
-    `vendorAddress` VARCHAR(255) NULL,
-    `vendorContact` VARCHAR(255) NULL,
-    `externalRef` VARCHAR(100) NULL,
     `metadata` JSON NULL,
     `isActive` BOOLEAN NOT NULL DEFAULT true,
-    `status` ENUM('active', 'inactive', 'blacklisted') NOT NULL DEFAULT 'active',
+    `status` ENUM('Active', 'Inactive', 'Blacklisted') NOT NULL DEFAULT 'Active',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
     INDEX `vendors_companyId_idx`(`companyId`),
-    UNIQUE INDEX `vendors_companyId_externalRef_key`(`companyId`, `externalRef`),
+    UNIQUE INDEX `vendors_companyId_vendorName_key`(`companyId`, `vendorName`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -112,42 +105,55 @@ CREATE TABLE `vendors` (
 CREATE TABLE `procurement_transactions` (
     `id` CHAR(36) NOT NULL,
     `companyId` CHAR(36) NOT NULL,
-    `vendorId` CHAR(36) NOT NULL,
     `employeeId` CHAR(36) NULL,
     `purchaseId` VARCHAR(100) NULL,
-    `poNumber` VARCHAR(100) NULL,
     `purchaseDate` DATETIME(3) NOT NULL,
-    `itemId` VARCHAR(100) NULL,
-    `itemDescription` TEXT NULL,
-    `quantity` DECIMAL(15, 2) NULL,
-    `unitPrice` DECIMAL(15, 2) NULL,
-    `amountTotal` DECIMAL(15, 2) NOT NULL,
+    `vendorName` VARCHAR(255) NOT NULL,
+    `itemDescription` TEXT NOT NULL,
     `department` VARCHAR(100) NULL,
-    `method` ENUM('pengadaan_langsung', 'tender_terbuka', 'tender_tertutup', 'e_purchasing', 'rfp', 'lainnya') NOT NULL DEFAULT 'lainnya',
-    `approvalDate` DATETIME(3) NULL,
-    `invoiceNumber` VARCHAR(100) NULL,
-    `invoiceDate` DATETIME(3) NULL,
-    `location` VARCHAR(100) NULL,
-    `contractId` VARCHAR(100) NULL,
-    `contractDate` DATETIME(3) NULL,
-    `paymentDate` DATETIME(3) NULL,
-    `status` ENUM('pending', 'reviewed', 'requires_attention', 'need_further_review') NOT NULL DEFAULT 'pending',
-    `reviewerNote` TEXT NULL,
-    `reviewedBy` CHAR(36) NULL,
-    `reviewedAt` DATETIME(3) NULL,
-    `importBatchId` CHAR(36) NULL,
-    `metadata` JSON NULL,
+    `amountTotal` DECIMAL(15, 2) NOT NULL,
+    `procurementMethod` ENUM('Pengadaan Langsung', 'Tender Terbuka', 'tender Tertutup', 'E-Purchasing', 'RFP', 'Lainnya') NOT NULL DEFAULT 'Lainnya',
+    `status` ENUM('Pending', 'Alert', 'High Alert', 'Auto Approved', 'Approved', 'Rejected') NOT NULL DEFAULT 'Pending',
+    `flags` JSON NULL,
+    `fraudScore` DOUBLE NULL,
+    `aiExplanation` TEXT NULL,
     `createdBy` CHAR(36) NOT NULL,
     `updatedBy` CHAR(36) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
     INDEX `procurement_transactions_companyId_idx`(`companyId`),
-    INDEX `procurement_transactions_vendorId_idx`(`vendorId`),
     INDEX `procurement_transactions_employeeId_idx`(`employeeId`),
     INDEX `procurement_transactions_status_idx`(`status`),
     INDEX `procurement_transactions_purchaseDate_idx`(`purchaseDate`),
-    INDEX `procurement_transactions_invoiceNumber_idx`(`invoiceNumber`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `expenses` (
+    `id` CHAR(36) NOT NULL,
+    `companyId` CHAR(36) NOT NULL,
+    `employeeId` CHAR(36) NOT NULL,
+    `expenseId` VARCHAR(100) NULL,
+    `expenseDate` DATETIME(3) NOT NULL,
+    `description` TEXT NOT NULL,
+    `category` ENUM('Entertainment', 'Transport', 'Office Supply', 'Meals', 'Vehicle', 'Training', 'Others') NOT NULL DEFAULT 'Others',
+    `merchant` VARCHAR(255) NULL,
+    `amountTotal` DECIMAL(15, 2) NOT NULL,
+    `department` VARCHAR(100) NULL,
+    `status` ENUM('Pending', 'Alert', 'High Alert', 'Auto Approved', 'Approved', 'Rejected') NOT NULL DEFAULT 'Pending',
+    `flags` JSON NULL,
+    `fraudScore` DOUBLE NULL,
+    `aiExplanation` TEXT NULL,
+    `createdBy` CHAR(36) NOT NULL,
+    `updatedBy` CHAR(36) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `expenses_companyId_idx`(`companyId`),
+    INDEX `expenses_employeeId_idx`(`employeeId`),
+    INDEX `expenses_status_idx`(`status`),
+    INDEX `expenses_expenseDate_idx`(`expenseDate`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -155,12 +161,14 @@ CREATE TABLE `procurement_transactions` (
 CREATE TABLE `fraud_analysis_results` (
     `id` CHAR(36) NOT NULL,
     `companyId` CHAR(36) NOT NULL,
-    `procurementId` CHAR(36) NOT NULL,
+    `procurementId` CHAR(36) NULL,
+    `expenseId` CHAR(36) NULL,
     `analysisType` ENUM('supervised', 'anomaly') NOT NULL,
     `status` ENUM('pending', 'processing', 'completed', 'failed') NOT NULL DEFAULT 'pending',
     `isFraud` BOOLEAN NULL,
     `fraudScore` DOUBLE NULL,
     `flags` JSON NULL,
+    `aiExplanation` TEXT NULL,
     `features` JSON NULL,
     `rawResponse` JSON NULL,
     `requestedAt` DATETIME(3) NULL,
@@ -170,8 +178,7 @@ CREATE TABLE `fraud_analysis_results` (
 
     INDEX `fraud_analysis_results_companyId_idx`(`companyId`),
     INDEX `fraud_analysis_results_procurementId_idx`(`procurementId`),
-    INDEX `fraud_analysis_results_analysisType_idx`(`analysisType`),
-    INDEX `fraud_analysis_results_status_idx`(`status`),
+    INDEX `fraud_analysis_results_expenseId_idx`(`expenseId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -203,13 +210,19 @@ ALTER TABLE `vendors` ADD CONSTRAINT `vendors_companyId_fkey` FOREIGN KEY (`comp
 ALTER TABLE `procurement_transactions` ADD CONSTRAINT `procurement_transactions_companyId_fkey` FOREIGN KEY (`companyId`) REFERENCES `companies`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `procurement_transactions` ADD CONSTRAINT `procurement_transactions_vendorId_fkey` FOREIGN KEY (`vendorId`) REFERENCES `vendors`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `procurement_transactions` ADD CONSTRAINT `procurement_transactions_employeeId_fkey` FOREIGN KEY (`employeeId`) REFERENCES `employees`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `procurement_transactions` ADD CONSTRAINT `procurement_transactions_employeeId_fkey` FOREIGN KEY (`employeeId`) REFERENCES `employees`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `expenses` ADD CONSTRAINT `expenses_companyId_fkey` FOREIGN KEY (`companyId`) REFERENCES `companies`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `expenses` ADD CONSTRAINT `expenses_employeeId_fkey` FOREIGN KEY (`employeeId`) REFERENCES `employees`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `fraud_analysis_results` ADD CONSTRAINT `fraud_analysis_results_companyId_fkey` FOREIGN KEY (`companyId`) REFERENCES `companies`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `fraud_analysis_results` ADD CONSTRAINT `fraud_analysis_results_procurementId_fkey` FOREIGN KEY (`procurementId`) REFERENCES `procurement_transactions`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `fraud_analysis_results` ADD CONSTRAINT `fraud_analysis_results_expenseId_fkey` FOREIGN KEY (`expenseId`) REFERENCES `expenses`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;

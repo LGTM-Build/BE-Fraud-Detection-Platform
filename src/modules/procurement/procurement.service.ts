@@ -1,239 +1,49 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, ProcurementMethod, ReviewStatus } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../core/errors/app-error";
-import { AuditLogService } from "../audit-logs/audit-log.service";
+import { groupToStatuses, statusLabel } from "../../core/utils/monitor-status";
 import { FraudDispatchService } from "../integrations/fraud/fraud-dispatch.service";
 
-const toPrismaJson = (
-  value: unknown,
-): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | undefined => {
-  if (value === undefined) return undefined;
-  if (value === null) return Prisma.JsonNull;
-  return value as Prisma.InputJsonValue;
-};
+function normalizeFlags(flags: unknown): string[] {
+  if (!flags) return [];
+  if (Array.isArray(flags)) return flags.filter(Boolean).map(String);
 
-type ReviewStatus =
-  | "pending"
-  | "reviewed"
-  | "requires_attention"
-  | "need_further_review";
-
-type ProcurementMethod =
-  | "pengadaan_langsung"
-  | "tender_terbuka"
-  | "tender_tertutup"
-  | "e_purchasing"
-  | "rfp"
-  | "lainnya";
-
-type CreateProcurementInput = {
-  vendorId: string;
-  employeeId?: string | null;
-  purchaseId?: string | null;
-  poNumber?: string | null;
-  purchaseDate: string;
-  itemId?: string | null;
-  itemDescription?: string | null;
-  quantity?: number | null;
-  unitPrice?: number | null;
-  amountTotal: number;
-  department?: string | null;
-  method?: ProcurementMethod;
-  approvalDate?: string | null;
-  invoiceNumber?: string | null;
-  invoiceDate?: string | null;
-  location?: string | null;
-  contractId?: string | null;
-  contractDate?: string | null;
-  paymentDate?: string | null;
-  metadata?: unknown;
-};
-
-type UpdateProcurementInput = Partial<CreateProcurementInput>;
-
-type UpdateProcurementStatusInput = {
-  status: ReviewStatus;
-  reviewerNote?: string | null;
-};
-
-type ListProcurementQuery = {
-  status?: ReviewStatus;
-  department?: string;
-  vendorId?: string;
-  minScore?: number;
-  maxScore?: number;
-  page?: number;
-  limit?: number;
-};
-
-const reviewStatusLabelMap: Record<ReviewStatus, string> = {
-  pending: "Pending",
-  reviewed: "Reviewed",
-  requires_attention: "Requires Attention",
-  need_further_review: "Need Further Review",
-};
-
-const procurementMethodLabelMap: Record<ProcurementMethod, string> = {
-  pengadaan_langsung: "Pengadaan Langsung",
-  tender_terbuka: "Tender Terbuka",
-  tender_tertutup: "Tender Tertutup",
-  e_purchasing: "E-Purchasing",
-  rfp: "RFP",
-  lainnya: "Lainnya",
-};
-
-const vendorStatusLabelMap: Record<string, string> = {
-  active: "Active",
-  inactive: "Inactive",
-  blacklisted: "Blacklisted",
-};
-
-type ProcurementListItem = {
-  id: string;
-  purchaseId: string | null;
-  poNumber: string | null;
-  purchaseDate: Date;
-  itemId: string | null;
-  itemDescription: string | null;
-  department: string | null;
-  method: ProcurementMethod;
-  amountTotal: unknown;
-  status: ReviewStatus;
-  reviewerNote: string | null;
-  reviewedBy: string | null;
-  reviewedAt: Date | null;
-  invoiceNumber: string | null;
-  invoiceDate: Date | null;
-  contractId: string | null;
-  contractDate: Date | null;
-  paymentDate: Date | null;
-  location: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  vendor: {
-    id: string;
-    vendorName: string;
-    vendorBankAccount: string | null;
-    vendorRegistrationDate: Date | null;
-    vendorAddress: string | null;
-    vendorContact: string | null;
-    status: string;
-  };
-  employee: {
-    id: string;
-    fullName: string;
-    department: string | null;
-    position: string | null;
-  } | null;
-  fraudResults?: Array<{
-    fraudScore: number | null;
-    flags: unknown;
-  }>;
-};
-
-function mapProcurementResponse(item: ProcurementListItem) {
-  const latestFraud = item.fraudResults?.[0];
-  const flags = latestFraud?.flags as
-    | string[]
-    | Record<string, unknown>
-    | null
-    | undefined;
-
-  let uiFlags: string[] = [];
-  if (Array.isArray(flags)) {
-    uiFlags = flags;
-  } else if (flags && typeof flags === "object") {
-    uiFlags = Object.entries(flags)
+  if (typeof flags === "object") {
+    return Object.entries(flags as Record<string, unknown>)
       .filter(([, value]) => Boolean(value))
       .map(([key]) => key);
   }
 
-  return {
-    id: item.id,
-    procurementId: item.purchaseId,
-    poNumber: item.poNumber,
-    date: item.purchaseDate,
-    vendor: {
-      id: item.vendor.id,
-      name: item.vendor.vendorName,
-      bankAccount: item.vendor.vendorBankAccount,
-      registrationDate: item.vendor.vendorRegistrationDate,
-      address: item.vendor.vendorAddress,
-      contact: item.vendor.vendorContact,
-      status: item.vendor.status,
-      statusLabel:
-        vendorStatusLabelMap[item.vendor.status] ?? item.vendor.status,
-    },
-    item: {
-      id: item.itemId,
-      description: item.itemDescription,
-    },
-    department: item.department,
-    method: item.method,
-    methodLabel:
-      procurementMethodLabelMap[item.method as ProcurementMethod] ??
-      item.method,
-    total: item.amountTotal,
-    employee: item.employee
-      ? {
-          id: item.employee.id,
-          name: item.employee.fullName,
-          department: item.employee.department,
-          position: item.employee.position,
-        }
-      : null,
-    score: latestFraud?.fraudScore ?? null,
-    flags: uiFlags,
-    status: item.status,
-    statusLabel:
-      reviewStatusLabelMap[item.status as ReviewStatus] ?? item.status,
-    review: {
-      reviewerNote: item.reviewerNote,
-      reviewedBy: item.reviewedBy,
-      reviewedAt: item.reviewedAt,
-    },
-    invoice: {
-      number: item.invoiceNumber,
-      date: item.invoiceDate,
-    },
-    contract: {
-      id: item.contractId,
-      date: item.contractDate,
-    },
-    paymentDate: item.paymentDate,
-    location: item.location,
-    createdAt: item.createdAt,
-    updatedAt: item.updatedAt,
-  };
+  return [];
 }
 
-type StatusCountItem = {
-  status: ReviewStatus;
-  _count: {
-    status: number;
+function procurementMethodLabel(method: ProcurementMethod) {
+  const map: Record<ProcurementMethod, string> = {
+    pengadaan_langsung: "Penunjukan Langsung",
+    tender_terbuka: "Tender Terbuka",
+    tender_tertutup: "Tender Tertutup",
+    e_purchasing: "E-Purchasing",
+    rfp: "RFP",
+    lainnya: "Lainnya",
   };
-};
 
-function getStatusCount(items: StatusCountItem[], status: ReviewStatus) {
-  return items.find((x) => x.status === status)?._count.status ?? 0;
+  return map[method];
 }
 
 export class ProcurementService {
   static async create(
     actor: { userId: string; companyId: string },
-    input: CreateProcurementInput,
+    input: {
+      employeeId?: string | null;
+      purchaseId?: string | null;
+      purchaseDate: string;
+      vendorName: string;
+      itemDescription: string;
+      department?: string | null;
+      amountTotal: number;
+      procurementMethod?: ProcurementMethod;
+    },
   ) {
-    const vendor = await prisma.vendor.findFirst({
-      where: {
-        id: input.vendorId,
-        companyId: actor.companyId,
-      },
-    });
-
-    if (!vendor) {
-      throw new AppError("Vendor not found", 404, "VENDOR_NOT_FOUND");
-    }
-
     if (input.employeeId) {
       const employee = await prisma.employee.findFirst({
         where: {
@@ -247,112 +57,51 @@ export class ProcurementService {
       }
     }
 
-    const procurement = await prisma.procurementTransaction.create({
+    return prisma.procurementTransaction.create({
       data: {
         companyId: actor.companyId,
-        vendorId: input.vendorId,
         employeeId: input.employeeId ?? null,
         purchaseId: input.purchaseId ?? null,
-        poNumber: input.poNumber ?? null,
         purchaseDate: new Date(input.purchaseDate),
-        itemId: input.itemId ?? null,
-        itemDescription: input.itemDescription ?? null,
-        quantity: input.quantity ?? null,
-        unitPrice: input.unitPrice ?? null,
-        amountTotal: input.amountTotal,
+        vendorName: input.vendorName,
+        itemDescription: input.itemDescription,
         department: input.department ?? null,
-        method: input.method ?? "lainnya",
-        approvalDate: input.approvalDate ? new Date(input.approvalDate) : null,
-        invoiceNumber: input.invoiceNumber ?? null,
-        invoiceDate: input.invoiceDate ? new Date(input.invoiceDate) : null,
-        location: input.location ?? null,
-        contractId: input.contractId ?? null,
-        contractDate: input.contractDate ? new Date(input.contractDate) : null,
-        paymentDate: input.paymentDate ? new Date(input.paymentDate) : null,
-        metadata: toPrismaJson(input.metadata),
+        amountTotal: input.amountTotal,
+        procurementMethod: input.procurementMethod ?? "lainnya",
         createdBy: actor.userId,
+        updatedBy: actor.userId,
       },
       include: {
-        vendor: true,
         employee: true,
       },
     });
-
-    await AuditLogService.create({
-      companyId: actor.companyId,
-      userId: actor.userId,
-      action: "create_procurement_transaction",
-      targetType: "procurement_transaction",
-      targetId: procurement.id,
-      note: "Created procurement transaction",
-      metadata: {
-        poNumber: procurement.poNumber,
-        purchaseId: procurement.purchaseId,
-        vendorId: procurement.vendorId,
-        amountTotal: procurement.amountTotal,
-      },
-    });
-
-    let fraudDispatch: any = null;
-    let fraudDispatchError: string | null = null;
-
-    try {
-      fraudDispatch = await FraudDispatchService.dispatchProcurement(
-        procurement.id,
-        "create_procurement",
-        "supervised",
-      );
-    } catch (error: any) {
-      fraudDispatchError =
-        error.message ?? "Failed to dispatch to fraud service";
-    }
-
-    return {
-      procurement,
-      fraudDispatch,
-      fraudDispatchError,
-    };
   }
 
   static async update(
     actor: { userId: string; companyId: string },
     id: string,
-    input: UpdateProcurementInput,
+    input: Partial<{
+      employeeId?: string | null;
+      purchaseId?: string | null;
+      purchaseDate: string;
+      vendorName: string;
+      itemDescription: string;
+      department?: string | null;
+      amountTotal: number;
+      procurementMethod?: ProcurementMethod;
+    }>,
   ) {
     const existing = await prisma.procurementTransaction.findFirst({
-      where: {
-        id,
-        companyId: actor.companyId,
-      },
+      where: { id, companyId: actor.companyId },
     });
 
     if (!existing) {
-      throw new AppError(
-        "Procurement transaction not found",
-        404,
-        "PROCUREMENT_NOT_FOUND",
-      );
-    }
-
-    if (input.vendorId) {
-      const vendor = await prisma.vendor.findFirst({
-        where: {
-          id: input.vendorId,
-          companyId: actor.companyId,
-        },
-      });
-
-      if (!vendor) {
-        throw new AppError("Vendor not found", 404, "VENDOR_NOT_FOUND");
-      }
+      throw new AppError("Procurement not found", 404, "PROCUREMENT_NOT_FOUND");
     }
 
     if (input.employeeId) {
       const employee = await prisma.employee.findFirst({
-        where: {
-          id: input.employeeId,
-          companyId: actor.companyId,
-        },
+        where: { id: input.employeeId, companyId: actor.companyId },
       });
 
       if (!employee) {
@@ -360,10 +109,9 @@ export class ProcurementService {
       }
     }
 
-    const updated = await prisma.procurementTransaction.update({
-      where: { id: existing.id },
+    return prisma.procurementTransaction.update({
+      where: { id },
       data: {
-        vendorId: input.vendorId ?? existing.vendorId,
         employeeId:
           input.employeeId === undefined
             ? existing.employeeId
@@ -372,216 +120,74 @@ export class ProcurementService {
           input.purchaseId === undefined
             ? existing.purchaseId
             : input.purchaseId,
-        poNumber:
-          input.poNumber === undefined ? existing.poNumber : input.poNumber,
         purchaseDate: input.purchaseDate
           ? new Date(input.purchaseDate)
           : existing.purchaseDate,
-        itemId: input.itemId === undefined ? existing.itemId : input.itemId,
-        itemDescription:
-          input.itemDescription === undefined
-            ? existing.itemDescription
-            : input.itemDescription,
-        quantity:
-          input.quantity === undefined ? existing.quantity : input.quantity,
-        unitPrice:
-          input.unitPrice === undefined ? existing.unitPrice : input.unitPrice,
-        amountTotal:
-          input.amountTotal === undefined
-            ? existing.amountTotal
-            : input.amountTotal,
+        vendorName: input.vendorName ?? existing.vendorName,
+        itemDescription: input.itemDescription ?? existing.itemDescription,
         department:
           input.department === undefined
             ? existing.department
             : input.department,
-        method: input.method ?? existing.method,
-        approvalDate:
-          input.approvalDate === undefined
-            ? existing.approvalDate
-            : input.approvalDate
-              ? new Date(input.approvalDate)
-              : null,
-        invoiceNumber:
-          input.invoiceNumber === undefined
-            ? existing.invoiceNumber
-            : input.invoiceNumber,
-        invoiceDate:
-          input.invoiceDate === undefined
-            ? existing.invoiceDate
-            : input.invoiceDate
-              ? new Date(input.invoiceDate)
-              : null,
-        location:
-          input.location === undefined ? existing.location : input.location,
-        contractId:
-          input.contractId === undefined
-            ? existing.contractId
-            : input.contractId,
-        contractDate:
-          input.contractDate === undefined
-            ? existing.contractDate
-            : input.contractDate
-              ? new Date(input.contractDate)
-              : null,
-        paymentDate:
-          input.paymentDate === undefined
-            ? existing.paymentDate
-            : input.paymentDate
-              ? new Date(input.paymentDate)
-              : null,
-        metadata:
-          input.metadata === undefined
-            ? undefined
-            : toPrismaJson(input.metadata),
+        amountTotal: input.amountTotal ?? existing.amountTotal,
+        procurementMethod:
+          input.procurementMethod === undefined
+            ? existing.procurementMethod
+            : input.procurementMethod,
         updatedBy: actor.userId,
       },
       include: {
-        vendor: true,
         employee: true,
       },
     });
-
-    await AuditLogService.create({
-      companyId: actor.companyId,
-      userId: actor.userId,
-      action: "update_procurement_transaction",
-      targetType: "procurement_transaction",
-      targetId: updated.id,
-      note: "Updated procurement transaction",
-      metadata: {
-        before: {
-          poNumber: existing.poNumber,
-          amountTotal: existing.amountTotal,
-          status: existing.status,
-        },
-        after: {
-          poNumber: updated.poNumber,
-          amountTotal: updated.amountTotal,
-          status: updated.status,
-        },
-      },
-    });
-
-    return updated;
   }
 
-  static async detail(companyId: string, id: string) {
-    const item = await prisma.procurementTransaction.findFirst({
-      where: {
-        id,
-        companyId,
-      },
-      include: {
-        vendor: true,
-        employee: true,
-        fraudResults: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-      },
-    });
-
-    if (!item) {
-      throw new AppError(
-        "Procurement transaction not found",
-        404,
-        "PROCUREMENT_NOT_FOUND",
-      );
-    }
-
-    return mapProcurementResponse(item);
-  }
-
-  static async updateStatus(
-    actor: { userId: string; companyId: string },
-    id: string,
-    input: UpdateProcurementStatusInput,
+  static async listMonitor(
+    companyId: string,
+    query: {
+      status?: ReviewStatus;
+      group?: string;
+      department?: string;
+      searchVendor?: string;
+      searchItem?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      page?: number;
+      limit?: number;
+    },
   ) {
-    const existing = await prisma.procurementTransaction.findFirst({
-      where: {
-        id,
-        companyId: actor.companyId,
-      },
-    });
-
-    if (!existing) {
-      throw new AppError(
-        "Procurement transaction not found",
-        404,
-        "PROCUREMENT_NOT_FOUND",
-      );
-    }
-
-    const updated = await prisma.procurementTransaction.update({
-      where: { id: existing.id },
-      data: {
-        status: input.status,
-        reviewerNote: input.reviewerNote ?? null,
-        reviewedBy: actor.userId,
-        reviewedAt: new Date(),
-        updatedBy: actor.userId,
-      },
-    });
-
-    await AuditLogService.create({
-      companyId: actor.companyId,
-      userId: actor.userId,
-      action: "update_procurement_status",
-      targetType: "procurement_transaction",
-      targetId: updated.id,
-      note: `Procurement status changed from ${existing.status} to ${updated.status}`,
-      metadata: {
-        previousStatus: existing.status,
-        currentStatus: updated.status,
-        reviewerNote: updated.reviewerNote,
-      },
-    });
-
-    return updated;
-  }
-
-  static async list(companyId: string, query: ListProcurementQuery) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
-
-    const fraudScoreFilter: Prisma.ProcurementTransactionWhereInput =
-      query.minScore !== undefined || query.maxScore !== undefined
-        ? {
-            fraudResults: {
-              some: {
-                fraudScore: {
-                  ...(query.minScore !== undefined
-                    ? { gte: query.minScore }
-                    : {}),
-                  ...(query.maxScore !== undefined
-                    ? { lte: query.maxScore }
-                    : {}),
-                },
-              },
-            },
-          }
-        : {};
+    const groupedStatuses = groupToStatuses(query.group);
 
     const where: Prisma.ProcurementTransactionWhereInput = {
       companyId,
       ...(query.status ? { status: query.status } : {}),
+      ...(groupedStatuses
+        ? { status: { in: groupedStatuses as ReviewStatus[] } }
+        : {}),
       ...(query.department ? { department: query.department } : {}),
-      ...(query.vendorId ? { vendorId: query.vendorId } : {}),
-      ...fraudScoreFilter,
+      ...(query.searchVendor
+        ? { vendorName: { contains: query.searchVendor } }
+        : {}),
+      ...(query.searchItem
+        ? { itemDescription: { contains: query.searchItem } }
+        : {}),
+      ...(query.dateFrom || query.dateTo
+        ? {
+            purchaseDate: {
+              ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+              ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+            },
+          }
+        : {}),
     };
 
-    const [items, total, statusCounts] = await Promise.all([
+    const [items, total, grouped] = await Promise.all([
       prisma.procurementTransaction.findMany({
         where,
-        include: {
-          vendor: true,
-          employee: true,
-          fraudResults: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-          },
-        },
+        include: { employee: true },
         orderBy: { purchaseDate: "desc" },
         skip,
         take: limit,
@@ -594,50 +200,110 @@ export class ProcurementService {
       }),
     ]);
 
-    const mappedItems = items.map(mapProcurementResponse);
-
-    const typedStatusCounts = statusCounts as StatusCountItem[];
-
-    const summary = {
-      semua: typedStatusCounts.reduce(
-        (acc, curr) => acc + curr._count.status,
-        0,
-      ),
-      byStatus: {
-        pending: getStatusCount(typedStatusCounts, "pending"),
-        reviewed: getStatusCount(typedStatusCounts, "reviewed"),
-        requires_attention: getStatusCount(
-          typedStatusCounts,
-          "requires_attention",
-        ),
-        need_further_review: getStatusCount(
-          typedStatusCounts,
-          "need_further_review",
-        ),
-      },
-      byStatusLabel: {
-        Pending: getStatusCount(typedStatusCounts, "pending"),
-        Reviewed: getStatusCount(typedStatusCounts, "reviewed"),
-        "Requires Attention": getStatusCount(
-          typedStatusCounts,
-          "requires_attention",
-        ),
-        "Need Further Review": getStatusCount(
-          typedStatusCounts,
-          "need_further_review",
-        ),
-      },
-    };
-
     return {
-      items: mappedItems,
+      items: items.map((item) => ({
+        id: item.id,
+        purchaseId: item.purchaseId,
+        purchaseDate: item.purchaseDate,
+        vendorName: item.vendorName,
+        itemDescription: item.itemDescription,
+        department: item.department,
+        amountTotal: item.amountTotal,
+        procurementMethod: item.procurementMethod,
+        procurementMethodLabel: procurementMethodLabel(item.procurementMethod),
+        fraudScore: item.fraudScore,
+        aiExplanation: item.aiExplanation,
+        flags: normalizeFlags(item.flags),
+        status: item.status,
+        statusLabel: statusLabel(item.status as any),
+      })),
       meta: {
         page,
         limit,
         total,
         totalPages: Math.ceil(total / limit),
       },
-      summary,
+      summary: {
+        all: grouped.reduce((acc, item) => acc + item._count.status, 0),
+        highAlert:
+          grouped.find((x) => x.status === "high_alert")?._count.status ?? 0,
+        alert: grouped.find((x) => x.status === "alert")?._count.status ?? 0,
+        autoApproved:
+          grouped.find((x) => x.status === "auto_approved")?._count.status ?? 0,
+        approved:
+          grouped.find((x) => x.status === "approved")?._count.status ?? 0,
+        rejected:
+          grouped.find((x) => x.status === "rejected")?._count.status ?? 0,
+        pending:
+          grouped.find((x) => x.status === "pending")?._count.status ?? 0,
+      },
     };
+  }
+
+  static async detailMonitor(companyId: string, id: string) {
+    const item = await prisma.procurementTransaction.findFirst({
+      where: { id, companyId },
+      include: { employee: true },
+    });
+
+    if (!item) {
+      throw new AppError("Procurement not found", 404, "PROCUREMENT_NOT_FOUND");
+    }
+
+    return {
+      id: item.id,
+      purchaseId: item.purchaseId,
+      purchaseDate: item.purchaseDate,
+      fraudScore: item.fraudScore,
+      aiExplanation: item.aiExplanation,
+      flags: normalizeFlags(item.flags),
+      detail: {
+        vendorName: item.vendorName,
+        itemDescription: item.itemDescription,
+        department: item.department,
+        requester: item.employee?.fullName ?? null,
+        approver: item.employee?.fullName ?? null,
+        procurementMethod: item.procurementMethod,
+        procurementMethodLabel: procurementMethodLabel(item.procurementMethod),
+        amountTotal: item.amountTotal,
+        status: item.status,
+        statusLabel: statusLabel(item.status as any),
+      },
+    };
+  }
+
+  static async review(
+    actor: { userId: string; companyId: string },
+    id: string,
+    input: { status: "approved" | "rejected" },
+  ) {
+    const existing = await prisma.procurementTransaction.findFirst({
+      where: { id, companyId: actor.companyId },
+    });
+
+    if (!existing) {
+      throw new AppError("Procurement not found", 404, "PROCUREMENT_NOT_FOUND");
+    }
+
+    return prisma.procurementTransaction.update({
+      where: { id },
+      data: {
+        status: input.status,
+        updatedBy: actor.userId,
+      },
+    });
+  }
+
+  static async dispatchMl(
+    actor: { userId: string; companyId: string },
+    id: string,
+  ) {
+    return FraudDispatchService.dispatchProcurementForCompany(
+      actor.companyId,
+      id,
+      actor.userId,
+      "manual_dispatch",
+      "supervised",
+    );
   }
 }

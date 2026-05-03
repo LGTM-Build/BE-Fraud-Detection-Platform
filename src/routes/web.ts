@@ -13,6 +13,8 @@ import { AuditLogController } from "../modules/audit-logs/audit-log.controller";
 import { ProcurementController } from "../modules/procurement/procurement.controller";
 import { FraudIntegrationController } from "../modules/integrations/fraud/fraud.controller";
 import { ImportController } from "../modules/imports/import.controller";
+import { ExpenseController } from "../modules/expenses/expense.controller";
+import { DashboardController } from "../modules/dashboard/dashboard.controller";
 
 const router = Router();
 
@@ -146,69 +148,115 @@ router.get(
   AuditLogController.list,
 );
 
-// Procurement Transactions
+// Dashboard
 router.get(
-  "/api/procurement-transactions",
+  "/api/dashboard/summary",
   authMiddleware,
   requireRole(["super_admin", "super_user", "auditor"]),
-  ProcurementController.list,
+  DashboardController.summary,
 );
 
 router.get(
-  "/api/procurement-transactions/:id",
+  "/api/dashboard/high-alerts",
   authMiddleware,
   requireRole(["super_admin", "super_user", "auditor"]),
-  ProcurementController.detail,
+  DashboardController.highAlerts,
+);
+
+router.get(
+  "/api/dashboard/latest-transactions",
+  authMiddleware,
+  requireRole(["super_admin", "super_user", "auditor"]),
+  DashboardController.latestTransactions,
+);
+
+// Procurement monitor
+router.get(
+  "/api/procurement-monitor",
+  authMiddleware,
+  requireRole(["super_admin", "super_user", "auditor"]),
+  ProcurementController.listMonitor,
+);
+
+router.get(
+  "/api/procurement-monitor/:id",
+  authMiddleware,
+  requireRole(["super_admin", "super_user", "auditor"]),
+  ProcurementController.detailMonitor,
 );
 
 router.post(
-  "/api/procurement-transactions",
+  "/api/procurements",
   authMiddleware,
   requireRole(["super_admin", "super_user"]),
   ProcurementController.create,
 );
 
 router.put(
-  "/api/procurement-transactions/:id",
+  "/api/procurements/:id",
   authMiddleware,
   requireRole(["super_admin", "super_user"]),
   ProcurementController.update,
 );
 
-router.patch(
-  "/api/procurement-transactions/:id/status",
+router.post(
+  "/api/procurement-monitor/:id/review",
   authMiddleware,
   requireRole(["super_admin", "super_user", "auditor"]),
-  ProcurementController.updateStatus,
+  ProcurementController.review,
 );
 
 router.post(
-  "/api/procurement-transactions/:id/dispatch-fraud",
+  "/api/procurement-monitor/:id/dispatch-ml",
   authMiddleware,
   requireRole(["super_admin", "super_user", "auditor"]),
-  ProcurementController.dispatchFraud,
+  ProcurementController.dispatchMl,
 );
 
-// Fraud Results From Python
-router.post(
-  "/api/internal/fraud-results",
-  internalApiKeyMiddleware,
-  FraudIntegrationController.insertSingle,
+// Expense monitor
+router.get(
+  "/api/expense-monitor",
+  authMiddleware,
+  requireRole(["super_admin", "super_user", "auditor"]),
+  ExpenseController.listMonitor,
+);
+
+router.get(
+  "/api/expense-monitor/:id",
+  authMiddleware,
+  requireRole(["super_admin", "super_user", "auditor"]),
+  ExpenseController.detailMonitor,
 );
 
 router.post(
-  "/api/internal/fraud-results/batch",
-  internalApiKeyMiddleware,
-  FraudIntegrationController.insertBatch,
+  "/api/expenses",
+  authMiddleware,
+  requireRole(["super_admin", "super_user"]),
+  ExpenseController.create,
 );
 
-// Import Procurement File
 router.post(
-  "/api/imports/procurement",
+  "/api/expense-monitor/:id/review",
+  authMiddleware,
+  requireRole(["super_admin", "super_user", "auditor"]),
+  ExpenseController.review,
+);
+
+// Import
+router.post(
+  "/api/imports/procurements",
   authMiddleware,
   requireRole(["super_admin", "super_user"]),
   upload.single("file"),
-  ImportController.importProcurement,
+  ImportController.importProcurements,
+);
+
+router.post(
+  "/api/imports/expenses",
+  authMiddleware,
+  requireRole(["super_admin", "super_user"]),
+  upload.single("file"),
+  ImportController.importExpenses,
 );
 
 export default router;
