@@ -153,4 +153,115 @@ export class DashboardService {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 8);
   }
+
+  static async fraudTrend(
+    companyId: string,
+    query: {
+      year?: number;
+      period?: "monthly";
+    },
+  ) {
+    const year = query.year ?? new Date().getFullYear();
+
+    const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
+    const endDate = new Date(`${year + 1}-01-01T00:00:00.000Z`);
+
+    const monthLabels = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "Mei",
+      "Jun",
+      "Jul",
+      "Agu",
+      "Sep",
+      "Okt",
+      "Nov",
+      "Des",
+    ];
+
+    const trendMap = new Map<
+      number,
+      {
+        label: string;
+        month: number;
+        expense: number;
+        procurement: number;
+        total: number;
+      }
+    >();
+
+    for (let month = 1; month <= 12; month++) {
+      trendMap.set(month, {
+        label: monthLabels[month - 1],
+        month,
+        expense: 0,
+        procurement: 0,
+        total: 0,
+      });
+    }
+
+    const [procurements, expenses] = await Promise.all([
+      prisma.procurementTransaction.findMany({
+        where: {
+          companyId,
+          status: {
+            in: ["alert", "high_alert"],
+          },
+          purchaseDate: {
+            gte: startDate,
+            lt: endDate,
+          },
+        },
+        select: {
+          id: true,
+          purchaseDate: true,
+        },
+      }),
+
+      prisma.expense.findMany({
+        where: {
+          companyId,
+          status: {
+            in: ["alert", "high_alert"],
+          },
+          expenseDate: {
+            gte: startDate,
+            lt: endDate,
+          },
+        },
+        select: {
+          id: true,
+          expenseDate: true,
+        },
+      }),
+    ]);
+
+    for (const item of procurements) {
+      const month = item.purchaseDate.getMonth() + 1;
+      const current = trendMap.get(month);
+
+      if (!current) continue;
+
+      current.procurement += 1;
+      current.total += 1;
+    }
+
+    for (const item of expenses) {
+      const month = item.expenseDate.getMonth() + 1;
+      const current = trendMap.get(month);
+
+      if (!current) continue;
+
+      current.expense += 1;
+      current.total += 1;
+    }
+
+    return {
+      period: query.period ?? "monthly",
+      year,
+      items: Array.from(trendMap.values()),
+    };
+  }
 }

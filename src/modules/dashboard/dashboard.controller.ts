@@ -56,4 +56,25 @@ export class DashboardController {
       next(error);
     }
   }
+
+  static async fraudTrend(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
+
+      const year = req.query.year ? Number(req.query.year) : undefined;
+
+      const data = await DashboardService.fraudTrend(req.auth.companyId, {
+        year,
+        period: "monthly",
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Dashboard fraud trend fetched successfully",
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

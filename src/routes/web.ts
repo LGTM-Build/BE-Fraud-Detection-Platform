@@ -170,6 +170,13 @@ router.get(
   DashboardController.latestTransactions,
 );
 
+router.get(
+  "/api/dashboard/fraud-trend",
+  authMiddleware,
+  requireRole(["super_admin", "super_user", "auditor"]),
+  DashboardController.fraudTrend,
+);
+
 // Procurement monitor
 router.get(
   "/api/procurement-monitor",
