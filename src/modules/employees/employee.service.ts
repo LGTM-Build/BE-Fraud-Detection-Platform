@@ -29,9 +29,7 @@ export class EmployeeService {
       phoneNumber: string;
       department?: string | null;
       position?: string | null;
-      avgMonthlyExpense?: number | null;
       externalRef?: string | null;
-      metadata?: unknown;
     },
   ) {
     if (input.externalRef) {
@@ -58,9 +56,7 @@ export class EmployeeService {
         phoneNumber: input.phoneNumber,
         department: input.department ?? null,
         position: input.position ?? null,
-        avgMonthlyExpense: input.avgMonthlyExpense ?? null,
         externalRef: input.externalRef ?? null,
-        metadata: input.metadata as any,
       },
     });
 
@@ -88,9 +84,7 @@ export class EmployeeService {
       phoneNumber: string;
       department?: string | null;
       position?: string | null;
-      avgMonthlyExpense?: number | null;
       externalRef?: string | null;
-      metadata?: unknown;
     },
   ) {
     const existing = await prisma.employee.findFirst({
@@ -132,18 +126,10 @@ export class EmployeeService {
             : input.department,
         position:
           input.position === undefined ? existing.position : input.position,
-        avgMonthlyExpense:
-          input.avgMonthlyExpense === undefined
-            ? existing.avgMonthlyExpense
-            : input.avgMonthlyExpense,
         externalRef:
           input.externalRef === undefined
             ? existing.externalRef
             : input.externalRef,
-        metadata:
-          input.metadata === undefined
-            ? existing.metadata
-            : (input.metadata as any),
       },
     });
 
