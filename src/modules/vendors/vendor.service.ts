@@ -77,7 +77,6 @@ export class VendorService {
       note: "Created vendor",
       metadata: {
         vendorName: vendor.vendorName,
-        externalRef: vendor.externalRef,
         status: vendor.status,
       },
     });
@@ -90,11 +89,6 @@ export class VendorService {
     id: string,
     input: {
       vendorName?: string;
-      vendorRegistrationDate?: string | null;
-      vendorBankAccount?: string | null;
-      vendorAddress?: string | null;
-      vendorContact?: string | null;
-      externalRef?: string | null;
       metadata?: unknown;
       status?: "active" | "inactive" | "blacklisted";
     },
@@ -107,49 +101,10 @@ export class VendorService {
       throw new AppError("Vendor not found", 404, "VENDOR_NOT_FOUND");
     }
 
-    if (input.externalRef && input.externalRef !== existing.externalRef) {
-      const duplicate = await prisma.vendor.findFirst({
-        where: {
-          companyId: actor.companyId,
-          externalRef: input.externalRef,
-        },
-      });
-
-      if (duplicate) {
-        throw new AppError(
-          "External ref already exists",
-          409,
-          "VENDOR_EXTERNAL_REF_EXISTS",
-        );
-      }
-    }
-
     const updated = await prisma.vendor.update({
       where: { id: existing.id },
       data: {
         vendorName: input.vendorName ?? existing.vendorName,
-        vendorRegistrationDate:
-          input.vendorRegistrationDate === undefined
-            ? existing.vendorRegistrationDate
-            : input.vendorRegistrationDate
-              ? new Date(input.vendorRegistrationDate)
-              : null,
-        vendorBankAccount:
-          input.vendorBankAccount === undefined
-            ? existing.vendorBankAccount
-            : input.vendorBankAccount,
-        vendorAddress:
-          input.vendorAddress === undefined
-            ? existing.vendorAddress
-            : input.vendorAddress,
-        vendorContact:
-          input.vendorContact === undefined
-            ? existing.vendorContact
-            : input.vendorContact,
-        externalRef:
-          input.externalRef === undefined
-            ? existing.externalRef
-            : input.externalRef,
         metadata:
           input.metadata === undefined
             ? existing.metadata
@@ -168,12 +123,10 @@ export class VendorService {
       metadata: {
         before: {
           vendorName: existing.vendorName,
-          vendorBankAccount: existing.vendorBankAccount,
           status: existing.status,
         },
         after: {
           vendorName: updated.vendorName,
-          vendorBankAccount: updated.vendorBankAccount,
           status: updated.status,
         },
       },
