@@ -26,43 +26,14 @@ export class VendorService {
     actor: { userId: string; companyId: string },
     input: {
       vendorName: string;
-      vendorRegistrationDate?: string | null;
-      vendorBankAccount?: string | null;
-      vendorAddress?: string | null;
-      vendorContact?: string | null;
-      externalRef?: string | null;
       metadata?: unknown;
       status?: "active" | "inactive" | "blacklisted";
     },
   ) {
-    if (input.externalRef) {
-      const duplicate = await prisma.vendor.findFirst({
-        where: {
-          companyId: actor.companyId,
-          externalRef: input.externalRef,
-        },
-      });
-
-      if (duplicate) {
-        throw new AppError(
-          "External ref already exists",
-          409,
-          "VENDOR_EXTERNAL_REF_EXISTS",
-        );
-      }
-    }
-
     const vendor = await prisma.vendor.create({
       data: {
         companyId: actor.companyId,
         vendorName: input.vendorName,
-        vendorRegistrationDate: input.vendorRegistrationDate
-          ? new Date(input.vendorRegistrationDate)
-          : null,
-        vendorBankAccount: input.vendorBankAccount ?? null,
-        vendorAddress: input.vendorAddress ?? null,
-        vendorContact: input.vendorContact ?? null,
-        externalRef: input.externalRef ?? null,
         metadata: input.metadata as any,
         status: input.status ?? "active",
       },
