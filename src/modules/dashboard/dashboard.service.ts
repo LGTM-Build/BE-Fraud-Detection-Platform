@@ -32,23 +32,39 @@ export class DashboardService {
       }),
     ]);
 
+    const procurementAlert =
+      procurementStatus.find((x) => x.status === "alert")?._count.status ?? 0;
+
+    const procurementHighAlert =
+      procurementStatus.find((x) => x.status === "high_alert")?._count.status ??
+      0;
+
+    const expenseAlert =
+      expenseStatus.find((x) => x.status === "alert")?._count.status ?? 0;
+
+    const expenseHighAlert =
+      expenseStatus.find((x) => x.status === "high_alert")?._count.status ?? 0;
+
     return {
       page: "Dashboard",
       totalTransactions: procurementCount + expenseCount,
+
+      // Semua transaksi yang perlu tindakan review
       needsReview:
-        (procurementStatus.find((x) => x.status === "alert")?._count.status ??
-          0) +
-        (expenseStatus.find((x) => x.status === "alert")?._count.status ?? 0),
-      highAlert:
-        (procurementStatus.find((x) => x.status === "high_alert")?._count
-          .status ?? 0) +
-        (expenseStatus.find((x) => x.status === "high_alert")?._count.status ??
-          0),
+        procurementAlert +
+        procurementHighAlert +
+        expenseAlert +
+        expenseHighAlert,
+
+      // Khusus high risk
+      highAlert: procurementHighAlert + expenseHighAlert,
+
       approved:
         (procurementStatus.find((x) => x.status === "approved")?._count
           .status ?? 0) +
         (expenseStatus.find((x) => x.status === "approved")?._count.status ??
           0),
+
       riskyAmountTotal:
         Number(procurementAgg._sum.amountTotal ?? 0) +
         Number(expenseAgg._sum.amountTotal ?? 0),
