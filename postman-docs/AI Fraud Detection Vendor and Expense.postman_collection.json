@@ -127,13 +127,7 @@
 					],
 					"request": {
 						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{access_token}}",
-								"type": "text"
-							}
-						],
+						"header": [],
 						"body": {
 							"mode": "raw",
 							"raw": "{\r\n  \"refreshToken\": \"{{refresh_token}}\"\r\n}",
@@ -248,9 +242,6 @@
 			"item": [
 				{
 					"name": "List User Under Company",
-					"protocolProfileBehavior": {
-						"disableBodyPruning": true
-					},
 					"request": {
 						"method": "GET",
 						"header": [
@@ -260,15 +251,6 @@
 								"type": "text"
 							}
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\r\n  \"employeeId\": null,\r\n  \"fullName\": \"Sabrina Aska\",\r\n  \"email\": \"sabrina@example.com\",\r\n  \"password\": \"secret123\",\r\n  \"role\": \"super_user\"\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
 						"url": {
 							"raw": "{{base_url}}/api/users",
 							"host": [
@@ -464,6 +446,18 @@
 				},
 				{
 					"name": "Add Employee",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
@@ -475,7 +469,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"fullName\": \"Ahmad Riadi\",\r\n  \"phoneNumber\": \"08123456889\",\r\n  \"department\": \"IT\",\r\n  \"position\": \"Manager\",\r\n  \"avgMonthlyExpense\": 2500000,\r\n  \"externalRef\": \"0686.11.2011.399\"\r\n}",
+							"raw": "{\r\n  \"fullName\": \"Sabrina Aska\",\r\n  \"phoneNumber\": \"08123456889\",\r\n  \"department\": \"IT\",\r\n  \"position\": \"Manager\",\r\n  \"avgMonthlyExpense\": 2500000,\r\n  \"externalRef\": \"0686.11.2011.399\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -544,7 +538,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"department\": \"IT\"\r\n    //\"phoneNumber\": \"085142689089\"\r\n}",
+							"raw": "{\r\n    \"department\": \"IT\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -797,16 +791,48 @@
 			"description": "Audit logs mempunyai filter pada params :\n\n- action\n    \n- targetType\n    \n- userId"
 		},
 		{
-			"name": "Procurement Transactions",
+			"name": "Fraud",
 			"item": [
 				{
-					"name": "List Procurement Transaction",
+					"name": "Dispatch Fraud",
 					"request": {
-						"method": "GET",
+						"method": "POST",
 						"header": [
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/procurement-monitor/:id_procurement/dispatch-ml",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"procurement-monitor",
+								":id_procurement",
+								"dispatch-ml"
+							],
+							"variable": [
+								{
+									"key": "id_procurement",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Result Fraud Single",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "x-internal-api-key",
+								"value": "{{internal_api_key}}",
 								"type": "text"
 							},
 							{
@@ -815,14 +841,209 @@
 								"type": "text"
 							}
 						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"analysisType\": \"supervised\",\r\n  \"generatedAt\": \"2026-04-25T10:00:05.000Z\",\r\n  \"modelMeta\": {\r\n    \"project\": \"Fradara — AI Fraud Detection Platform\",\r\n    \"version\": \"1.0.0-supervised\",\r\n    \"modelType\": \"Supervised Learning — Random Forest + XGBoost Ensemble\",\r\n    \"jobId\": \"fraud-job-20260425-0001\"\r\n  },\r\n  \"purchaseId\": \"PUR-2026-001\",\r\n  \"transactionType\": \"procurement\",\r\n  \"employeeId\": \"0686.11.2011.399\",\r\n  \"department\": \"IT\",\r\n  \"amountTotal\": 30000000,\r\n  \"category\": \"Laptop\",\r\n  \"purchaseDate\": \"2026-04-19\",\r\n  \"vendorName\": \"PT Sumber Makmur\",\r\n  \"scores\": {\r\n    \"randomForest\": 98.31,\r\n    \"xgboost\": 99.99,\r\n    \"ensemble\": 99.32,\r\n    \"fraudScore\": 99.32\r\n  },\r\n  \"riskLevel\": \"HIGH\",\r\n  \"predictedFraud\": true,\r\n  \"actualFraud\": null,\r\n  \"correct\": null,\r\n  \"reasons\": [\r\n    \"Nominal 9.4x di atas median kategori\",\r\n    \"Vendor sangat baru\"\r\n  ]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
 						"url": {
-							"raw": "{{base_url}}/api/procurement-transactions?page=1&limit=20",
+							"raw": "{{base_url}}/api/internal/fraud-results",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
 								"api",
-								"procurement-transactions"
+								"internal",
+								"fraud-results"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Result Fraud Batch",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "x-internal-api-key",
+								"value": "{{internal_api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"analysisType\": \"anomaly\",\r\n  \"generatedAt\": \"2026-04-25T10:05:00.000Z\",\r\n  \"modelMeta\": {\r\n    \"project\": \"Fradara — AI Fraud Detection Platform\",\r\n    \"version\": \"3.0.0\",\r\n    \"modelType\": \"Anomaly Detection — Isolation Forest + Autoencoder Ensemble\",\r\n    \"jobId\": \"fraud-job-20260425-batch-0001\"\r\n  },\r\n  \"samplePredictions\": [\r\n    {\r\n      \"purchaseId\": \"PUR-2026-001\",\r\n      \"employeeId\": \"0686.11.2011.399\",\r\n      \"department\": \"IT\",\r\n      \"transactionType\": \"procurement\",\r\n      \"amountTotal\": 30000000,\r\n      \"category\": \"Laptop\",\r\n      \"purchaseDate\": \"2026-04-19\",\r\n      \"vendorName\": \"PT Sumber Makmur\",\r\n      \"scores\": {\r\n        \"isolationForest\": 100,\r\n        \"autoencoder\": 100,\r\n        \"ensemble\": 100,\r\n        \"fraudScore\": 100\r\n      },\r\n      \"riskLevel\": \"HIGH\",\r\n      \"predictedFraud\": true,\r\n      \"actualFraud\": null,\r\n      \"correct\": null,\r\n      \"reasons\": [\r\n        \"Nominal jauh di atas rata-rata\",\r\n        \"Vendor sangat baru\"\r\n      ]\r\n    }\r\n  ]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/internal/fraud-results/batch",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"internal",
+								"fraud-results",
+								"batch"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Dispatch Fraud Manually itu kalo misal deteksi fraudnya ada yang gagal nanti dia post make id procurement yang gagal itu"
+		},
+		{
+			"name": "Dashboard",
+			"item": [
+				{
+					"name": "Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/dashboard/summary",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"dashboard",
+								"summary"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "High Alert",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/dashboard/high-alerts",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"dashboard",
+								"high-alerts"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Latest Transaction",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/dashboard/latest-transactions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"dashboard",
+								"latest-transactions"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Fraud Trend",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/dashboard/fraud-trend?period=monthly&year=2026",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"dashboard",
+								"fraud-trend"
+							],
+							"query": [
+								{
+									"key": "period",
+									"value": "monthly"
+								},
+								{
+									"key": "year",
+									"value": "2026"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Procurement Monitor",
+			"item": [
+				{
+					"name": "List Procurement",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/procurement-monitor?page=1&limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"procurement-monitor"
 							],
 							"query": [
 								{
@@ -839,7 +1060,44 @@
 					"response": []
 				},
 				{
-					"name": "Create Procurement Transaction",
+					"name": "Detail Procurement",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/procurement-monitor/:id_procurement",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"procurement-monitor",
+								":id_procurement"
+							],
+							"variable": [
+								{
+									"key": "id_procurement",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Menu->Monitor\n\nParams **GET** \\-> sertakan dengan page n limit untuk pagination\n\n``` bash\n{{base_url}}/api/procurement-monitor?page=1&limit=20\n\n ```\n\nFilter Params:\n\n``` bash\n#Pending\n{{base_url}}/api/procurement-monitor?group=ml_pending&page=1&limit=20\n#Needs Review\n{{base_url}}/api/procurement-monitor?group=needs_review&page=1&limit=20\n#Reviewed\n{{base_url}}/api/procurement-monitor?group=reviewed&page=1&limit=20\n#Search Vendor\n{{base_url}}/api/procurement-monitor?searchVendor=Sumber&page=1&limit=20\n#Search Item\n{{base_url}}/api/procurement-monitor?searchItem=Laptop&page=1&limit=20\n\n ```"
+		},
+		{
+			"name": "Procurement",
+			"item": [
+				{
+					"name": "Add Procurement",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -851,7 +1109,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"vendorId\": \"b89d9a18-c9bc-4813-8a11-104fee3f47d5\",\r\n  \"employeeId\": \"a1b21421-f23b-473f-80ff-c26f357d717c\",\r\n  \"purchaseId\": \"PUR-2026-001\",\r\n  \"poNumber\": \"PO-2026-001\",\r\n  \"purchaseDate\": \"2026-04-19T10:00:00.000Z\",\r\n  \"itemId\": \"ITEM-001\",\r\n  \"itemDescription\": \"Laptop procurement\",\r\n  \"quantity\": 2,\r\n  \"unitPrice\": 15000000,\r\n  \"amountTotal\": 30000000,\r\n  \"department\": \"IT\",\r\n  \"method\": \"pengadaan_langsung\",\r\n  \"approvalDate\": \"2026-04-19T11:00:00.000Z\",\r\n  \"invoiceNumber\": \"INV-2026-001\",\r\n  \"invoiceDate\": \"2026-04-19T12:00:00.000Z\",\r\n  \"location\": \"Jakarta\",\r\n  \"contractId\": \"CTR-2026-001\",\r\n  \"contractDate\": \"2026-04-18T09:00:00.000Z\",\r\n  \"paymentDate\": \"2026-04-20T09:00:00.000Z\",\r\n  \"metadata\": {\r\n    \"source\": \"manual_input\",\r\n    \"notes\": \"urgent purchase\"\r\n  }\r\n}",
+							"raw": "{\r\n  \"employeeId\": \"{{employee_id}}\",\r\n  \"purchaseDate\": \"2026-04-19T00:00:00.000Z\",\r\n  \"vendorName\": \"PT Sumber Makmur\",\r\n  \"itemDescription\": \"Laptop Lenovo ThinkPad\",\r\n  \"department\": \"IT\",\r\n  \"amountTotal\": 30000000,\r\n  \"procurementMethod\": \"pengadaan_langsung\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -859,20 +1117,20 @@
 							}
 						},
 						"url": {
-							"raw": "{{base_url}}/api/procurement-transactions",
+							"raw": "{{base_url}}/api/procurements",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
 								"api",
-								"procurement-transactions"
+								"procurements"
 							]
 						}
 					},
 					"response": []
 				},
 				{
-					"name": "Edit Procurement Transactions",
+					"name": "Update Procurement",
 					"request": {
 						"method": "PUT",
 						"header": [
@@ -884,7 +1142,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"department\": \"Finance\",\r\n  \"location\": \"Jakarta\"\r\n}",
+							"raw": "{\r\n  \"vendorName\": \"PT Sumber Makmur Updated\",\r\n  \"itemDescription\": \"Laptop Dell Latitude\",\r\n  \"amountTotal\": 27500000,\r\n  \"department\": \"IT\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -892,18 +1150,18 @@
 							}
 						},
 						"url": {
-							"raw": "{{base_url}}/api/procurement-transactions/:id",
+							"raw": "{{base_url}}/api/procurements/:id_procurement",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
 								"api",
-								"procurement-transactions",
-								":id"
+								"procurements",
+								":id_procurement"
 							],
 							"variable": [
 								{
-									"key": "id",
+									"key": "id_procurement",
 									"value": ""
 								}
 							]
@@ -912,9 +1170,9 @@
 					"response": []
 				},
 				{
-					"name": "Edit Procurement Transaction Status",
+					"name": "Review Procurement",
 					"request": {
-						"method": "PATCH",
+						"method": "POST",
 						"header": [
 							{
 								"key": "Authorization",
@@ -924,7 +1182,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"status\": \"requires_attention\"\r\n}",
+							"raw": "{\r\n  \"status\": \"approved\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -932,19 +1190,19 @@
 							}
 						},
 						"url": {
-							"raw": "{{base_url}}/api/procurement-transactions/:id/status",
+							"raw": "{{base_url}}/api/procurement-monitor/:id_procurement/review",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
 								"api",
-								"procurement-transactions",
-								":id",
-								"status"
+								"procurement-monitor",
+								":id_procurement",
+								"review"
 							],
 							"variable": [
 								{
-									"key": "id",
+									"key": "id_procurement",
 									"value": ""
 								}
 							]
@@ -953,7 +1211,53 @@
 					"response": []
 				},
 				{
-					"name": "Detail Procurement Transaction",
+					"name": "Import Procurement",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/imports/procurements?dispatchMl=true",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"imports",
+								"procurements"
+							],
+							"query": [
+								{
+									"key": "dispatchMl",
+									"value": "true"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Expense Monitor",
+			"item": [
+				{
+					"name": "List Expense",
 					"request": {
 						"method": "GET",
 						"header": [
@@ -961,26 +1265,55 @@
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}",
 								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/api/procurement-transactions/:id",
+							"raw": "{{base_url}}/api/expense-monitor?page=1&limit=20",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
 								"api",
-								"procurement-transactions",
-								":id"
+								"expense-monitor"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Detail Expense",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/expense-monitor/:id_expense",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"expense-monitor",
+								":id_expense"
 							],
 							"variable": [
 								{
-									"key": "id",
+									"key": "id_expense",
 									"value": ""
 								}
 							]
@@ -989,7 +1322,138 @@
 					"response": []
 				}
 			],
-			"description": "Get **Procurement List** filter:\n\n- status: \\[pending, reviewed, requires_attention, need_further_review\\]\n    \n- department\n    \n- Page & limit"
+			"description": "Menu->Monitor\n\nParams **GET** -> sertakan dengan page n limit untuk pagination\n\n``` bash\nhttp://localhost:8080/api/expense-monitor?page=1&limit=20\n\n ```\n\nFilter Params:\n\n``` bash\n#Pending\nhttp://localhost:8080/api/expense-monitor?group=ml_pending&page=1&limit=20\n#Needs Review\nhttp://localhost:8080/api/expense-monitor?group=needs_review&page=1&limit=20\n#Reviewed\nhttp://localhost:8080/api/expense-monitor?group=reviewed&page=1&limit=20\n#Search Nama Employee\nhttp://localhost:8080/api/expense-monitor?searchEmployee=Sabrina&page=1&limit=20\n#Search Deskripsi\nhttp://localhost:8080/api/expense-monitor?searchDescription=hotel&page=1&limit=20\n#Status\nhttp://localhost:8080/api/expense-monitor?status=high_alert&page=1&limit=20\n\n ```"
+		},
+		{
+			"name": "Expense",
+			"item": [
+				{
+					"name": "Add Expense",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"employeeId\": \"{{employee_id}}\",\r\n  \"expenseDate\": \"2026-04-20T00:00:00.000Z\",\r\n  \"description\": \"Hotel untuk perjalanan dinas\",\r\n  \"category\": \"transport\",\r\n  \"merchant\": \"Hotel Santika\",\r\n  \"amountTotal\": 2500000,\r\n  \"department\": \"IT\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/expenses",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"expenses"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Review Expense",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"status\": \"approved\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/expense-monitor/:id_expense/review",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"expense-monitor",
+								":id_expense",
+								"review"
+							],
+							"variable": [
+								{
+									"key": "id_expense",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Import Expense",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/imports/expenses",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"imports",
+								"expenses"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Check Backend",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health-check",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"health-check"
+					]
+				}
+			},
+			"response": []
 		}
 	]
 }
