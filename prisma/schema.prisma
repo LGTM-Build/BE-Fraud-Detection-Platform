@@ -116,6 +116,12 @@ model User {
   sessions  UserSession[]
   auditLogs AuditLog[]
 
+  createdProcurements ProcurementTransaction[] @relation("ProcurementCreatedBy")
+  updatedProcurements ProcurementTransaction[] @relation("ProcurementUpdatedBy")
+
+  createdExpenses Expense[] @relation("ExpenseCreatedBy")
+  updatedExpenses Expense[] @relation("ExpenseUpdatedBy")
+
   @@index([companyId])
   @@index([employeeId])
   @@map("users")
@@ -225,10 +231,16 @@ model ProcurementTransaction {
 
   company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employee          Employee?         @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  createdByUser     User              @relation("ProcurementCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  updatedByUser     User?             @relation("ProcurementUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+
   fraudResults      FraudAnalysisResult[]
 
   @@index([companyId])
   @@index([employeeId])
+  @@index([createdBy])
+  @@index([updatedBy])
   @@index([status])
   @@index([purchaseDate])
   @@map("procurement_transactions")
@@ -262,8 +274,13 @@ model Expense {
   company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employee      Employee        @relation(fields: [employeeId], references: [id], onDelete: Restrict)
 
+  createdByUser User            @relation("ExpenseCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  updatedByUser User?           @relation("ExpenseUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+
   @@index([companyId])
   @@index([employeeId])
+  @@index([createdBy])
+  @@index([updatedBy])
   @@index([status])
   @@index([expenseDate])
   @@map("expenses")

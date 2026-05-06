@@ -124,7 +124,33 @@ export class ExpenseService {
     const [items, total, grouped] = await Promise.all([
       prisma.expense.findMany({
         where,
-        include: { employee: true },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              fullName: true,
+              department: true,
+              position: true,
+              externalRef: true,
+            },
+          },
+          createdByUser: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              role: true,
+            },
+          },
+          updatedByUser: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              role: true,
+            },
+          },
+        },
         orderBy: { expenseDate: "desc" },
         skip,
         take: limit,
@@ -142,9 +168,39 @@ export class ExpenseService {
         id: item.id,
         expenseId: item.expenseId,
         expenseDate: item.expenseDate,
+
+        employeeId: item.employeeId,
+        employeeName: item.employee.fullName,
+        employee: {
+          id: item.employee.id,
+          fullName: item.employee.fullName,
+          department: item.employee.department,
+          position: item.employee.position,
+          externalRef: item.employee.externalRef,
+        },
+
+        createdBy: item.createdBy,
+        createdByName: item.createdByUser.fullName,
+        createdByUser: {
+          id: item.createdByUser.id,
+          fullName: item.createdByUser.fullName,
+          email: item.createdByUser.email,
+          role: item.createdByUser.role,
+        },
+
+        updatedBy: item.updatedBy,
+        updatedByName: item.updatedByUser?.fullName ?? null,
+        updatedByUser: item.updatedByUser
+          ? {
+              id: item.updatedByUser.id,
+              fullName: item.updatedByUser.fullName,
+              email: item.updatedByUser.email,
+              role: item.updatedByUser.role,
+            }
+          : null,
+
         department: item.department,
         description: item.description,
-        employeeId: item.employeeId,
         fullName: item.employee.fullName,
         position: item.employee.position,
         amountTotal: item.amountTotal,
@@ -156,6 +212,8 @@ export class ExpenseService {
         flags: normalizeFlags(item.flags),
         status: item.status,
         statusLabel: statusLabel(item.status as any),
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
       })),
       meta: {
         page,
@@ -183,7 +241,33 @@ export class ExpenseService {
   static async detailMonitor(companyId: string, id: string) {
     const item = await prisma.expense.findFirst({
       where: { id, companyId },
-      include: { employee: true },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            fullName: true,
+            department: true,
+            position: true,
+            externalRef: true,
+          },
+        },
+        createdByUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            role: true,
+          },
+        },
+        updatedByUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
     });
 
     if (!item) {
@@ -196,6 +280,19 @@ export class ExpenseService {
       fraudScore: item.fraudScore,
       aiExplanation: item.aiExplanation,
       flags: normalizeFlags(item.flags),
+
+      employeeId: item.employeeId,
+      employeeName: item.employee.fullName,
+      employee: item.employee,
+
+      createdBy: item.createdBy,
+      createdByName: item.createdByUser.fullName,
+      createdByUser: item.createdByUser,
+
+      updatedBy: item.updatedBy,
+      updatedByName: item.updatedByUser?.fullName ?? null,
+      updatedByUser: item.updatedByUser,
+
       detail: {
         description: item.description,
         category: item.category,
