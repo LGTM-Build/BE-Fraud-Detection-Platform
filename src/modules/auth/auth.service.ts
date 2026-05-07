@@ -61,7 +61,7 @@ export class AuthService {
         },
       });
 
-      const newEmployee = await tx.employee.create({
+      const employee = await tx.employee.create({
         data: {
           companyId: company.id,
           fullName: input.fullName,
@@ -120,7 +120,7 @@ export class AuthService {
       return {
         company,
         user,
-        newEmployee,
+        employee,
         accessToken,
         refreshToken,
       };
