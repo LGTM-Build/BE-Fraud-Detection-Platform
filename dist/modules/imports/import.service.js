@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -39,71 +6,132 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ImportService = void 0;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
+const xlsx_1 = __importDefault(require("xlsx"));
 const sync_1 = require("csv-parse/sync");
-const XLSX = __importStar(require("xlsx"));
 const prisma_1 = require("../../lib/prisma");
 const app_error_1 = require("../../core/errors/app-error");
 const fraud_dispatch_service_1 = require("../integrations/fraud/fraud-dispatch.service");
 const business_id_1 = require("../../core/utils/business-id");
+function normalizeHeader(value) {
+    return String(value)
+        .replace(/^\uFEFF/, "")
+        .trim();
+}
+function normalizeText(value) {
+    if (value === undefined || value === null)
+        return undefined;
+    const text = String(value).trim();
+    return text === "" ? undefined : text;
+}
+function normalizeRowKeys(row) {
+    const normalized = {};
+    for (const [key, value] of Object.entries(row)) {
+        normalized[normalizeHeader(key)] = value;
+    }
+    return normalized;
+}
+function getMappedValue(row, fieldName, mapping) {
+    const normalizedRow = normalizeRowKeys(row);
+    const mappedColumn = mapping?.[fieldName];
+    const normalizedMappedColumn = mappedColumn
+        ? normalizeHeader(mappedColumn)
+        : undefined;
+    if (normalizedMappedColumn &&
+        normalizedRow[normalizedMappedColumn] !== undefined) {
+        return normalizedRow[normalizedMappedColumn];
+    }
+    return normalizedRow[fieldName];
+}
 function parseNumber(value) {
     if (value === undefined || value === null || value === "")
         return null;
-    const parsed = Number(value);
+    if (typeof value === "number") {
+        return Number.isNaN(value) ? null : value;
+    }
+    const normalized = String(value).trim().replace(/\./g, "").replace(/,/g, ".");
+    const parsed = Number(normalized);
     return Number.isNaN(parsed) ? null : parsed;
 }
 function parseDate(value) {
-    if (!value)
+    if (value === undefined || value === null || value === "")
         return null;
-    const date = new Date(value);
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value;
+    }
+    if (typeof value === "number") {
+        const parsed = xlsx_1.default.SSF.parse_date_code(value);
+        if (!parsed)
+            return null;
+        return new Date(Date.UTC(parsed.y, parsed.m - 1, parsed.d));
+    }
+    const text = String(value).trim();
+    // Format YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+        const [year, month, day] = text.split("-").map(Number);
+        return new Date(Date.UTC(year, month - 1, day));
+    }
+    // Format DD/MM/YYYY
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(text)) {
+        const [day, month, year] = text.split("/").map(Number);
+        return new Date(Date.UTC(year, month - 1, day));
+    }
+    // Format DD-MM-YYYY
+    if (/^\d{2}-\d{2}-\d{4}$/.test(text)) {
+        const [day, month, year] = text.split("-").map(Number);
+        return new Date(Date.UTC(year, month - 1, day));
+    }
+    const date = new Date(text);
     return Number.isNaN(date.getTime()) ? null : date;
 }
 function readRowsFromFile(filePath) {
     const ext = path_1.default.extname(filePath).toLowerCase();
     if (ext === ".csv") {
-        const content = fs_1.default.readFileSync(filePath, "utf-8");
-        return (0, sync_1.parse)(content, {
+        const fileContent = fs_1.default.readFileSync(filePath, "utf8");
+        const rows = (0, sync_1.parse)(fileContent, {
             columns: true,
             skip_empty_lines: true,
             trim: true,
+            bom: true,
         });
+        return rows.map((row) => normalizeRowKeys(row));
     }
-    if (ext === ".xlsx") {
-        const workbook = XLSX.readFile(filePath);
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        return XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+    if (ext === ".xlsx" || ext === ".xls") {
+        const workbook = xlsx_1.default.readFile(filePath);
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) {
+            throw new app_error_1.AppError("Excel file has no sheet", 400, "EMPTY_FILE");
+        }
+        const sheet = workbook.Sheets[sheetName];
+        const rows = xlsx_1.default.utils.sheet_to_json(sheet, {
+            defval: "",
+            raw: true,
+        });
+        return rows.map((row) => normalizeRowKeys(row));
     }
     throw new app_error_1.AppError("Unsupported file type", 400, "UNSUPPORTED_FILE_TYPE");
 }
-function getMappedValue(row, fieldName, mapping) {
-    const mappedColumn = mapping?.[fieldName];
-    if (mappedColumn && row[mappedColumn] !== undefined) {
-        return row[mappedColumn];
-    }
-    return row[fieldName];
-}
 function normalizeProcurementRow(row, mapping) {
     return {
-        purchaseId: getMappedValue(row, "purchaseId", mapping),
+        purchaseId: normalizeText(getMappedValue(row, "purchaseId", mapping)),
         purchaseDate: getMappedValue(row, "purchaseDate", mapping),
-        vendorName: getMappedValue(row, "vendorName", mapping),
-        itemDescription: getMappedValue(row, "itemDescription", mapping),
-        department: getMappedValue(row, "department", mapping),
+        vendorName: normalizeText(getMappedValue(row, "vendorName", mapping)),
+        itemDescription: normalizeText(getMappedValue(row, "itemDescription", mapping)),
+        department: normalizeText(getMappedValue(row, "department", mapping)),
         amountTotal: getMappedValue(row, "amountTotal", mapping),
-        procurementMethod: getMappedValue(row, "procurementMethod", mapping),
-        employeeExternalRef: getMappedValue(row, "employeeExternalRef", mapping),
+        procurementMethod: normalizeText(getMappedValue(row, "procurementMethod", mapping)),
+        employeeExternalRef: normalizeText(getMappedValue(row, "employeeExternalRef", mapping)),
     };
 }
 function normalizeExpenseRow(row, mapping) {
     return {
-        expenseId: getMappedValue(row, "expenseId", mapping),
+        expenseId: normalizeText(getMappedValue(row, "expenseId", mapping)),
         expenseDate: getMappedValue(row, "expenseDate", mapping),
-        department: getMappedValue(row, "department", mapping),
-        description: getMappedValue(row, "description", mapping),
-        employeeExternalRef: getMappedValue(row, "employeeExternalRef", mapping),
+        department: normalizeText(getMappedValue(row, "department", mapping)),
+        description: normalizeText(getMappedValue(row, "description", mapping)),
+        employeeExternalRef: normalizeText(getMappedValue(row, "employeeExternalRef", mapping)),
         amountTotal: getMappedValue(row, "amountTotal", mapping),
-        category: getMappedValue(row, "category", mapping),
-        merchant: getMappedValue(row, "merchant", mapping),
+        category: normalizeText(getMappedValue(row, "category", mapping)),
+        merchant: normalizeText(getMappedValue(row, "merchant", mapping)),
     };
 }
 function normalizeProcurementMethod(value) {

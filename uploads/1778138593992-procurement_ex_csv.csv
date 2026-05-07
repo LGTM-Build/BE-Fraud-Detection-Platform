@@ -1,0 +1,5 @@
+purchaseId,purchaseDate,vendorName,itemDescription,department,amountTotal,procurementMethod,employeeExternalRef
+PRC-0001,2026-04-10,UD Stationery Plus,Alat Tulis Kantor bulk order,General Affairs,3750000,pengadaan_langsung,EMP-001
+PRC-0002,2026-04-12,CV Maju Bersama,Pengadaan ATK dan perlengkapan kantor,Procurement,18500000,pengadaan_langsung,EMP-002
+PRC-0003,2026-04-11,PT Solusi Digital Indonesia,Jasa konsultasi pengembangan sistem,IT,75000000,rfp,EMP-003
+PRC-0004,2026-04-03,CV Berkah Jaya Abadi,Catering rapat direksi Q2,Secretary,8200000,pengadaan_langsung,EMP-004

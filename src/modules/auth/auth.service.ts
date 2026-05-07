@@ -61,6 +61,15 @@ export class AuthService {
         },
       });
 
+      const newEmployee = await tx.employee.create({
+        data: {
+          companyId: company.id,
+          fullName: input.fullName,
+          phoneNumber: "08000000000",
+          position: "Owner",
+        },
+      });
+
       const session = await tx.userSession.create({
         data: {
           companyId: company.id,
@@ -111,6 +120,7 @@ export class AuthService {
       return {
         company,
         user,
+        newEmployee,
         accessToken,
         refreshToken,
       };

@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
+import xlsx from "xlsx";
 import { parse } from "csv-parse/sync";
-import * as XLSX from "xlsx";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../core/errors/app-error";
 import { FraudDispatchService } from "../integrations/fraud/fraud-dispatch.service";
@@ -10,11 +10,6 @@ import {
   generatePurchaseId,
 } from "../../core/utils/business-id";
 
-type ProcurementImportMapping = Partial<
-  Record<keyof ProcurementImportRow, string>
->;
-type ExpenseImportMapping = Partial<Record<keyof ExpenseImportRow, string>>;
-
 type Actor = {
   userId: string;
   companyId: string;
@@ -22,7 +17,7 @@ type Actor = {
 
 type ProcurementImportRow = {
   purchaseId?: string;
-  purchaseDate?: string;
+  purchaseDate?: string | number | Date;
   vendorName?: string;
   itemDescription?: string;
   department?: string;
@@ -33,7 +28,7 @@ type ProcurementImportRow = {
 
 type ExpenseImportRow = {
   expenseId?: string;
-  expenseDate?: string;
+  expenseDate?: string | number | Date;
   department?: string;
   description?: string;
   employeeExternalRef?: string;
@@ -42,15 +37,109 @@ type ExpenseImportRow = {
   merchant?: string;
 };
 
+type ProcurementImportMapping = Partial<
+  Record<keyof ProcurementImportRow, string>
+>;
+
+type ExpenseImportMapping = Partial<Record<keyof ExpenseImportRow, string>>;
+
+function normalizeHeader(value: string) {
+  return String(value)
+    .replace(/^\uFEFF/, "")
+    .trim();
+}
+
+function normalizeText(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+
+  const text = String(value).trim();
+
+  return text === "" ? undefined : text;
+}
+
+function normalizeRowKeys(row: Record<string, any>) {
+  const normalized: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(row)) {
+    normalized[normalizeHeader(key)] = value;
+  }
+
+  return normalized;
+}
+
+function getMappedValue(
+  row: Record<string, any>,
+  fieldName: string,
+  mapping?: Partial<Record<string, string>>,
+) {
+  const normalizedRow = normalizeRowKeys(row);
+
+  const mappedColumn = mapping?.[fieldName];
+  const normalizedMappedColumn = mappedColumn
+    ? normalizeHeader(mappedColumn)
+    : undefined;
+
+  if (
+    normalizedMappedColumn &&
+    normalizedRow[normalizedMappedColumn] !== undefined
+  ) {
+    return normalizedRow[normalizedMappedColumn];
+  }
+
+  return normalizedRow[fieldName];
+}
+
 function parseNumber(value?: string | number | null): number | null {
   if (value === undefined || value === null || value === "") return null;
-  const parsed = Number(value);
+
+  if (typeof value === "number") {
+    return Number.isNaN(value) ? null : value;
+  }
+
+  const normalized = String(value).trim().replace(/\./g, "").replace(/,/g, ".");
+
+  const parsed = Number(normalized);
+
   return Number.isNaN(parsed) ? null : parsed;
 }
 
-function parseDate(value?: string | null): Date | null {
-  if (!value) return null;
-  const date = new Date(value);
+function parseDate(value?: string | number | Date | null): Date | null {
+  if (value === undefined || value === null || value === "") return null;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value === "number") {
+    const parsed = xlsx.SSF.parse_date_code(value);
+
+    if (!parsed) return null;
+
+    return new Date(Date.UTC(parsed.y, parsed.m - 1, parsed.d));
+  }
+
+  const text = String(value).trim();
+
+  // Format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    const [year, month, day] = text.split("-").map(Number);
+    return new Date(Date.UTC(year, month - 1, day));
+  }
+
+  // Format DD/MM/YYYY
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(text)) {
+    const [day, month, year] = text.split("/").map(Number);
+    return new Date(Date.UTC(year, month - 1, day));
+  }
+
+  // Format DD-MM-YYYY
+  if (/^\d{2}-\d{2}-\d{4}$/.test(text)) {
+    const [day, month, year] = text.split("-").map(Number);
+    return new Date(Date.UTC(year, month - 1, day));
+  }
+
+  const date = new Date(text);
+
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -58,36 +147,37 @@ function readRowsFromFile<T>(filePath: string): T[] {
   const ext = path.extname(filePath).toLowerCase();
 
   if (ext === ".csv") {
-    const content = fs.readFileSync(filePath, "utf-8");
-    return parse(content, {
+    const fileContent = fs.readFileSync(filePath, "utf8");
+
+    const rows = parse(fileContent, {
       columns: true,
       skip_empty_lines: true,
       trim: true,
-    });
+      bom: true,
+    }) as Record<string, any>[];
+
+    return rows.map((row) => normalizeRowKeys(row)) as T[];
   }
 
-  if (ext === ".xlsx") {
-    const workbook = XLSX.readFile(filePath);
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
-    return XLSX.utils.sheet_to_json<T>(worksheet, { defval: "" });
+  if (ext === ".xlsx" || ext === ".xls") {
+    const workbook = xlsx.readFile(filePath);
+    const sheetName = workbook.SheetNames[0];
+
+    if (!sheetName) {
+      throw new AppError("Excel file has no sheet", 400, "EMPTY_FILE");
+    }
+
+    const sheet = workbook.Sheets[sheetName];
+
+    const rows = xlsx.utils.sheet_to_json<Record<string, any>>(sheet, {
+      defval: "",
+      raw: true,
+    });
+
+    return rows.map((row) => normalizeRowKeys(row)) as T[];
   }
 
   throw new AppError("Unsupported file type", 400, "UNSUPPORTED_FILE_TYPE");
-}
-
-function getMappedValue<T extends Record<string, any>>(
-  row: Record<string, any>,
-  fieldName: keyof T,
-  mapping?: Partial<Record<keyof T, string>>,
-) {
-  const mappedColumn = mapping?.[fieldName];
-
-  if (mappedColumn && row[mappedColumn] !== undefined) {
-    return row[mappedColumn];
-  }
-
-  return row[fieldName as string];
 }
 
 function normalizeProcurementRow(
@@ -95,45 +185,41 @@ function normalizeProcurementRow(
   mapping?: ProcurementImportMapping,
 ): ProcurementImportRow {
   return {
-    purchaseId: getMappedValue<ProcurementImportRow>(
-      row,
-      "purchaseId",
-      mapping,
+    purchaseId: normalizeText(
+      getMappedValue(row, "purchaseId", mapping as Record<string, string>),
     ),
-    purchaseDate: getMappedValue<ProcurementImportRow>(
+    purchaseDate: getMappedValue(
       row,
       "purchaseDate",
-      mapping,
+      mapping as Record<string, string>,
     ),
-    vendorName: getMappedValue<ProcurementImportRow>(
-      row,
-      "vendorName",
-      mapping,
+    vendorName: normalizeText(
+      getMappedValue(row, "vendorName", mapping as Record<string, string>),
     ),
-    itemDescription: getMappedValue<ProcurementImportRow>(
-      row,
-      "itemDescription",
-      mapping,
+    itemDescription: normalizeText(
+      getMappedValue(row, "itemDescription", mapping as Record<string, string>),
     ),
-    department: getMappedValue<ProcurementImportRow>(
-      row,
-      "department",
-      mapping,
+    department: normalizeText(
+      getMappedValue(row, "department", mapping as Record<string, string>),
     ),
-    amountTotal: getMappedValue<ProcurementImportRow>(
+    amountTotal: getMappedValue(
       row,
       "amountTotal",
-      mapping,
+      mapping as Record<string, string>,
     ),
-    procurementMethod: getMappedValue<ProcurementImportRow>(
-      row,
-      "procurementMethod",
-      mapping,
+    procurementMethod: normalizeText(
+      getMappedValue(
+        row,
+        "procurementMethod",
+        mapping as Record<string, string>,
+      ),
     ),
-    employeeExternalRef: getMappedValue<ProcurementImportRow>(
-      row,
-      "employeeExternalRef",
-      mapping,
+    employeeExternalRef: normalizeText(
+      getMappedValue(
+        row,
+        "employeeExternalRef",
+        mapping as Record<string, string>,
+      ),
     ),
   };
 }
@@ -143,18 +229,38 @@ function normalizeExpenseRow(
   mapping?: ExpenseImportMapping,
 ): ExpenseImportRow {
   return {
-    expenseId: getMappedValue<ExpenseImportRow>(row, "expenseId", mapping),
-    expenseDate: getMappedValue<ExpenseImportRow>(row, "expenseDate", mapping),
-    department: getMappedValue<ExpenseImportRow>(row, "department", mapping),
-    description: getMappedValue<ExpenseImportRow>(row, "description", mapping),
-    employeeExternalRef: getMappedValue<ExpenseImportRow>(
-      row,
-      "employeeExternalRef",
-      mapping,
+    expenseId: normalizeText(
+      getMappedValue(row, "expenseId", mapping as Record<string, string>),
     ),
-    amountTotal: getMappedValue<ExpenseImportRow>(row, "amountTotal", mapping),
-    category: getMappedValue<ExpenseImportRow>(row, "category", mapping),
-    merchant: getMappedValue<ExpenseImportRow>(row, "merchant", mapping),
+    expenseDate: getMappedValue(
+      row,
+      "expenseDate",
+      mapping as Record<string, string>,
+    ),
+    department: normalizeText(
+      getMappedValue(row, "department", mapping as Record<string, string>),
+    ),
+    description: normalizeText(
+      getMappedValue(row, "description", mapping as Record<string, string>),
+    ),
+    employeeExternalRef: normalizeText(
+      getMappedValue(
+        row,
+        "employeeExternalRef",
+        mapping as Record<string, string>,
+      ),
+    ),
+    amountTotal: getMappedValue(
+      row,
+      "amountTotal",
+      mapping as Record<string, string>,
+    ),
+    category: normalizeText(
+      getMappedValue(row, "category", mapping as Record<string, string>),
+    ),
+    merchant: normalizeText(
+      getMappedValue(row, "merchant", mapping as Record<string, string>),
+    ),
   };
 }
 
@@ -221,6 +327,7 @@ export class ImportService {
       id: string;
       purchaseId: string | null;
     }> = [];
+
     const errors: Array<{
       rowNumber: number;
       purchaseId?: string;
@@ -253,11 +360,13 @@ export class ImportService {
         }
 
         const amountTotal = parseNumber(row.amountTotal);
+
         if (amountTotal === null) {
           throw new AppError("amountTotal is invalid", 400, "VALIDATION_ERROR");
         }
 
         const purchaseDate = parseDate(row.purchaseDate);
+
         if (!purchaseDate) {
           throw new AppError(
             "purchaseDate is invalid",
@@ -372,6 +481,7 @@ export class ImportService {
       id: string;
       expenseId: string | null;
     }> = [];
+
     const errors: Array<{
       rowNumber: number;
       expenseId?: string;
@@ -408,11 +518,13 @@ export class ImportService {
         }
 
         const amountTotal = parseNumber(row.amountTotal);
+
         if (amountTotal === null) {
           throw new AppError("amountTotal is invalid", 400, "VALIDATION_ERROR");
         }
 
         const expenseDate = parseDate(row.expenseDate);
+
         if (!expenseDate) {
           throw new AppError("expenseDate is invalid", 400, "VALIDATION_ERROR");
         }
