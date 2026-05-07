@@ -1,175 +1,163 @@
 import { env } from "../../../config/env";
 import { prisma } from "../../../lib/prisma";
 import { AppError } from "../../../core/errors/app-error";
-import { FraudClient, ProcurementFraudDispatchPayload } from "./fraud.client";
+import { FraudClient } from "./fraud.client";
 
-type DispatchReason =
-  | "create_procurement"
-  | "update_procurement"
-  | "manual_dispatch";
-
-function formatDateOnly(date: Date | null | undefined): string | null {
-  if (!date) return null;
+function formatDateOnly(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
 export class FraudDispatchService {
-  private static buildPayload(
-    procurement: {
-      id: string;
-      companyId: string;
-      createdBy: string;
-      purchaseId: string | null;
-      purchaseDate: Date;
-      amountTotal: unknown;
-      unitPrice: unknown;
-      quantity: unknown;
-      itemDescription: string | null;
-      itemId: string | null;
-      department: string | null;
-      approvalDate: Date | null;
-      status: string;
-      invoiceNumber: string | null;
-      invoiceDate: Date | null;
-      location: string | null;
-      contractId: string | null;
-      contractDate: Date | null;
-      paymentDate: Date | null;
-      vendor: {
-        id: string;
-        vendorName: string;
-        vendorRegistrationDate: Date | null;
-        vendorBankAccount: string | null;
-        vendorAddress: string | null;
-        vendorContact: string | null;
-      };
-      employee: {
-        id: string;
-        externalRef: string | null;
-      } | null;
-    },
-    dispatchReason: DispatchReason,
-    analysisType: "supervised" | "anomaly" = "supervised",
-    callbackMode: "single" | "batch" = "single",
-  ): ProcurementFraudDispatchPayload {
-    const callbackPath =
-      callbackMode === "single"
-        ? "/api/internal/fraud-results"
-        : "/api/internal/fraud-results/batch";
-
-    return {
-      jobContext: {
-        jobId: null,
-        requestedAt: new Date().toISOString(),
-        callbackMode,
-        callbackUrl: `${env.BACKEND_BASE_URL}${callbackPath}`,
-        callbackHeaders: {
-          "x-internal-api-key": env.INTERNAL_API_KEY,
+  static async dispatchProcurements(
+    actor: { userId: string; companyId: string },
+    procurementIds: string[],
+    source: "import" | "manual" = "manual",
+  ) {
+    const procurements = await prisma.procurementTransaction.findMany({
+      where: {
+        companyId: actor.companyId,
+        id: {
+          in: procurementIds,
         },
       },
-      analysisContext: {
-        analysisType,
-        entityType: "procurement_transaction",
-        sourceSystem: "node_backend",
-        modelPreference: "auto",
-      },
-      transaction: {
-        procurementId: procurement.id,
-        purchaseId: procurement.purchaseId ?? null,
-        purchaseDate: formatDateOnly(procurement.purchaseDate)!,
-        amountTotal: Number(procurement.amountTotal),
-        unitPrice:
-          procurement.unitPrice !== null && procurement.unitPrice !== undefined
-            ? Number(procurement.unitPrice)
-            : null,
-        quantity:
-          procurement.quantity !== null && procurement.quantity !== undefined
-            ? Number(procurement.quantity)
-            : null,
-        itemDescription: procurement.itemDescription ?? null,
-        itemId: procurement.itemId ?? null,
-        department: procurement.department ?? null,
-        employeeId:
-          procurement.employee?.externalRef ?? procurement.employee?.id ?? null,
-        approvalDate: formatDateOnly(procurement.approvalDate),
-        status: procurement.status,
-        invoiceNumber: procurement.invoiceNumber ?? null,
-        invoiceDate: formatDateOnly(procurement.invoiceDate),
-        location: procurement.location ?? null,
-        contractId: procurement.contractId ?? null,
-        contractDate: formatDateOnly(procurement.contractDate),
-        paymentDate: formatDateOnly(procurement.paymentDate),
-      },
-      vendor: {
-        vendorId: procurement.vendor.id,
-        vendorName: procurement.vendor.vendorName,
-        vendorRegistrationDate: formatDateOnly(
-          procurement.vendor.vendorRegistrationDate,
-        ),
-        vendorBankAccount: procurement.vendor.vendorBankAccount ?? null,
-        vendorAddress: procurement.vendor.vendorAddress ?? null,
-        vendorContact: procurement.vendor.vendorContact ?? null,
-      },
-      metadata: {
-        companyId: procurement.companyId,
-        createdBy: procurement.createdBy,
-        dispatchReason,
-      },
-    };
-  }
-
-  static async dispatchProcurement(
-    procurementId: string,
-    dispatchReason: DispatchReason = "manual_dispatch",
-    analysisType: "supervised" | "anomaly" = "supervised",
-  ) {
-    const procurement = await prisma.procurementTransaction.findUnique({
-      where: { id: procurementId },
       include: {
-        vendor: true,
-        employee: true,
+        employee: {
+          select: {
+            externalRef: true,
+          },
+        },
       },
     });
 
-    if (!procurement) {
+    if (!procurements.length) {
       throw new AppError(
-        "Procurement transaction not found",
+        "No procurement transactions found",
         404,
-        "PROCUREMENT_NOT_FOUND",
+        "PROCUREMENTS_NOT_FOUND",
       );
     }
 
-    const payload = this.buildPayload(
-      procurement,
-      dispatchReason,
-      analysisType,
-    );
+    const payload = {
+      module: "procurement" as const,
+      callbackUrl: `${env.BACKEND_BASE_URL}/api/internal/fraud-results/batch`,
+      callbackHeaders: {
+        "x-internal-api-key": env.INTERNAL_API_KEY,
+      },
+      records: procurements.map((item) => ({
+        id: item.id,
+        purchaseId: item.purchaseId,
+        purchaseDate: formatDateOnly(item.purchaseDate),
+        vendorName: item.vendorName,
+        itemDescription: item.itemDescription,
+        department: item.department,
+        amountTotal: Number(item.amountTotal),
+        procurementMethod: item.procurementMethod,
+        employeeExternalRef: item.employee?.externalRef ?? null,
+      })),
+      metadata: {
+        source,
+        companyId: actor.companyId,
+        requestedBy: actor.userId,
+      },
+    };
 
-    const pythonResponse = await FraudClient.submitProcurement(payload);
+    const pythonResponse = await FraudClient.submitBatch(payload);
 
     await prisma.auditLog.create({
       data: {
-        companyId: procurement.companyId,
-        userId: procurement.createdBy,
-        action: "dispatch_procurement_to_fraud_service",
+        companyId: actor.companyId,
+        userId: actor.userId,
+        action: "dispatch_procurements_to_fraud_service",
         targetType: "procurement_transaction",
-        targetId: procurement.id,
-        note: "Procurement transaction dispatched to Python fraud service",
+        targetId: null,
+        note: "Procurement transactions dispatched to Python fraud service",
         metadata: {
-          dispatchReason,
-          analysisType,
-          payload,
+          source,
+          procurementIds,
           pythonResponse,
         },
       },
     });
 
     return {
-      procurementId: procurement.id,
-      purchaseId: procurement.purchaseId,
-      dispatchReason,
-      analysisType,
-      callbackUrl: payload.jobContext.callbackUrl,
+      module: "procurement",
+      totalDispatched: procurements.length,
+      callbackUrl: payload.callbackUrl,
+      pythonResponse,
+    };
+  }
+
+  static async dispatchExpenses(
+    actor: { userId: string; companyId: string },
+    expenseIds: string[],
+    source: "import" | "manual" = "manual",
+  ) {
+    const expenses = await prisma.expense.findMany({
+      where: {
+        companyId: actor.companyId,
+        id: {
+          in: expenseIds,
+        },
+      },
+      include: {
+        employee: {
+          select: {
+            externalRef: true,
+          },
+        },
+      },
+    });
+
+    if (!expenses.length) {
+      throw new AppError("No expenses found", 404, "EXPENSES_NOT_FOUND");
+    }
+
+    const payload = {
+      module: "expense" as const,
+      callbackUrl: `${env.BACKEND_BASE_URL}/api/internal/fraud-results/batch`,
+      callbackHeaders: {
+        "x-internal-api-key": env.INTERNAL_API_KEY,
+      },
+      records: expenses.map((item) => ({
+        id: item.id,
+        expenseId: item.expenseId,
+        expenseDate: formatDateOnly(item.expenseDate),
+        department: item.department,
+        description: item.description,
+        employeeExternalRef: item.employee.externalRef ?? null,
+        amountTotal: Number(item.amountTotal),
+        category: item.category,
+        merchant: item.merchant,
+      })),
+      metadata: {
+        source,
+        companyId: actor.companyId,
+        requestedBy: actor.userId,
+      },
+    };
+
+    const pythonResponse = await FraudClient.submitBatch(payload);
+
+    await prisma.auditLog.create({
+      data: {
+        companyId: actor.companyId,
+        userId: actor.userId,
+        action: "dispatch_expenses_to_fraud_service",
+        targetType: "expense",
+        targetId: null,
+        note: "Expenses dispatched to Python fraud service",
+        metadata: {
+          source,
+          expenseIds,
+          pythonResponse,
+        },
+      },
+    });
+
+    return {
+      module: "expense",
+      totalDispatched: expenses.length,
+      callbackUrl: payload.callbackUrl,
       pythonResponse,
     };
   }
@@ -178,60 +166,14 @@ export class FraudDispatchService {
     companyId: string,
     procurementId: string,
     actorUserId: string,
-    dispatchReason: DispatchReason = "manual_dispatch",
-    analysisType: "supervised" | "anomaly" = "supervised",
   ) {
-    const procurement = await prisma.procurementTransaction.findFirst({
-      where: {
-        id: procurementId,
+    return this.dispatchProcurements(
+      {
         companyId,
-      },
-      include: {
-        vendor: true,
-        employee: true,
-      },
-    });
-
-    if (!procurement) {
-      throw new AppError(
-        "Procurement transaction not found",
-        404,
-        "PROCUREMENT_NOT_FOUND",
-      );
-    }
-
-    const payload = this.buildPayload(
-      procurement,
-      dispatchReason,
-      analysisType,
-    );
-
-    const pythonResponse = await FraudClient.submitProcurement(payload);
-
-    await prisma.auditLog.create({
-      data: {
-        companyId: procurement.companyId,
         userId: actorUserId,
-        action: "dispatch_procurement_to_fraud_service",
-        targetType: "procurement_transaction",
-        targetId: procurement.id,
-        note: "Procurement transaction manually dispatched to Python fraud service",
-        metadata: {
-          dispatchReason,
-          analysisType,
-          payload,
-          pythonResponse,
-        },
       },
-    });
-
-    return {
-      procurementId: procurement.id,
-      purchaseId: procurement.purchaseId,
-      dispatchReason,
-      analysisType,
-      callbackUrl: payload.jobContext.callbackUrl,
-      pythonResponse,
-    };
+      [procurementId],
+      "manual",
+    );
   }
 }

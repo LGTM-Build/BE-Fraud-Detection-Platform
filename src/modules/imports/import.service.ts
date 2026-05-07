@@ -5,6 +5,15 @@ import * as XLSX from "xlsx";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../core/errors/app-error";
 import { FraudDispatchService } from "../integrations/fraud/fraud-dispatch.service";
+import {
+  generateExpenseId,
+  generatePurchaseId,
+} from "../../core/utils/business-id";
+
+type ProcurementImportMapping = Partial<
+  Record<keyof ProcurementImportRow, string>
+>;
+type ExpenseImportMapping = Partial<Record<keyof ExpenseImportRow, string>>;
 
 type Actor = {
   userId: string;
@@ -67,6 +76,88 @@ function readRowsFromFile<T>(filePath: string): T[] {
   throw new AppError("Unsupported file type", 400, "UNSUPPORTED_FILE_TYPE");
 }
 
+function getMappedValue<T extends Record<string, any>>(
+  row: Record<string, any>,
+  fieldName: keyof T,
+  mapping?: Partial<Record<keyof T, string>>,
+) {
+  const mappedColumn = mapping?.[fieldName];
+
+  if (mappedColumn && row[mappedColumn] !== undefined) {
+    return row[mappedColumn];
+  }
+
+  return row[fieldName as string];
+}
+
+function normalizeProcurementRow(
+  row: Record<string, any>,
+  mapping?: ProcurementImportMapping,
+): ProcurementImportRow {
+  return {
+    purchaseId: getMappedValue<ProcurementImportRow>(
+      row,
+      "purchaseId",
+      mapping,
+    ),
+    purchaseDate: getMappedValue<ProcurementImportRow>(
+      row,
+      "purchaseDate",
+      mapping,
+    ),
+    vendorName: getMappedValue<ProcurementImportRow>(
+      row,
+      "vendorName",
+      mapping,
+    ),
+    itemDescription: getMappedValue<ProcurementImportRow>(
+      row,
+      "itemDescription",
+      mapping,
+    ),
+    department: getMappedValue<ProcurementImportRow>(
+      row,
+      "department",
+      mapping,
+    ),
+    amountTotal: getMappedValue<ProcurementImportRow>(
+      row,
+      "amountTotal",
+      mapping,
+    ),
+    procurementMethod: getMappedValue<ProcurementImportRow>(
+      row,
+      "procurementMethod",
+      mapping,
+    ),
+    employeeExternalRef: getMappedValue<ProcurementImportRow>(
+      row,
+      "employeeExternalRef",
+      mapping,
+    ),
+  };
+}
+
+function normalizeExpenseRow(
+  row: Record<string, any>,
+  mapping?: ExpenseImportMapping,
+): ExpenseImportRow {
+  return {
+    expenseId: getMappedValue<ExpenseImportRow>(row, "expenseId", mapping),
+    expenseDate: getMappedValue<ExpenseImportRow>(row, "expenseDate", mapping),
+    department: getMappedValue<ExpenseImportRow>(row, "department", mapping),
+    description: getMappedValue<ExpenseImportRow>(row, "description", mapping),
+    employeeExternalRef: getMappedValue<ExpenseImportRow>(
+      row,
+      "employeeExternalRef",
+      mapping,
+    ),
+    amountTotal: getMappedValue<ExpenseImportRow>(row, "amountTotal", mapping),
+    category: getMappedValue<ExpenseImportRow>(row, "category", mapping),
+    merchant: getMappedValue<ExpenseImportRow>(row, "merchant", mapping),
+  };
+}
+
 function normalizeProcurementMethod(
   value?: string,
 ):
@@ -114,8 +205,12 @@ export class ImportService {
     actor: Actor,
     filePath: string,
     dispatchMl = false,
+    mapping?: ProcurementImportMapping,
   ) {
-    const rows = readRowsFromFile<ProcurementImportRow>(filePath);
+    const rawRows = readRowsFromFile<Record<string, any>>(filePath);
+    const rows = rawRows.map((row) => normalizeProcurementRow(row, mapping));
+
+    const createdIds: string[] = [];
 
     if (!rows.length) {
       throw new AppError("File is empty", 400, "EMPTY_FILE");
@@ -192,11 +287,14 @@ export class ImportService {
           employeeId = employee.id;
         }
 
+        const purchaseId =
+          row.purchaseId || (await generatePurchaseId(actor.companyId));
+
         const created = await prisma.procurementTransaction.create({
           data: {
             companyId: actor.companyId,
             employeeId,
-            purchaseId: row.purchaseId || null,
+            purchaseId,
             purchaseDate,
             vendorName: row.vendorName,
             itemDescription: row.itemDescription,
@@ -210,17 +308,7 @@ export class ImportService {
           },
         });
 
-        if (dispatchMl) {
-          try {
-            await FraudDispatchService.dispatchProcurement(
-              created.id,
-              "create_procurement",
-              "supervised",
-            );
-          } catch {
-            // jangan gagalkan import row
-          }
-        }
+        createdIds.push(created.id);
 
         successes.push({
           rowNumber,
@@ -236,6 +324,23 @@ export class ImportService {
       }
     }
 
+    let aiDispatch: any = null;
+
+    if (dispatchMl && createdIds.length > 0) {
+      try {
+        aiDispatch = await FraudDispatchService.dispatchProcurements(
+          actor,
+          createdIds,
+          "import",
+        );
+      } catch (error: any) {
+        aiDispatch = {
+          success: false,
+          message: error.message ?? "Failed to dispatch procurements to AI",
+        };
+      }
+    }
+
     return {
       filename: path.basename(filePath),
       totalRows: rows.length,
@@ -243,11 +348,20 @@ export class ImportService {
       failedRows: errors.length,
       successes,
       errors,
+      aiDispatch,
     };
   }
 
-  static async importExpenses(actor: Actor, filePath: string) {
-    const rows = readRowsFromFile<ExpenseImportRow>(filePath);
+  static async importExpenses(
+    actor: Actor,
+    filePath: string,
+    dispatchMl = false,
+    mapping?: ExpenseImportMapping,
+  ) {
+    const rawRows = readRowsFromFile<Record<string, any>>(filePath);
+    const rows = rawRows.map((row) => normalizeExpenseRow(row, mapping));
+
+    const createdIds: string[] = [];
 
     if (!rows.length) {
       throw new AppError("File is empty", 400, "EMPTY_FILE");
@@ -318,11 +432,14 @@ export class ImportService {
           );
         }
 
+        const expenseId =
+          row.expenseId || (await generateExpenseId(actor.companyId));
+
         const created = await prisma.expense.create({
           data: {
             companyId: actor.companyId,
             employeeId: employee.id,
-            expenseId: row.expenseId || null,
+            expenseId,
             expenseDate,
             description: row.description,
             category: normalizeExpenseCategory(row.category),
@@ -333,6 +450,8 @@ export class ImportService {
             updatedBy: actor.userId,
           },
         });
+
+        createdIds.push(created.id);
 
         successes.push({
           rowNumber,
@@ -348,6 +467,23 @@ export class ImportService {
       }
     }
 
+    let aiDispatch: any = null;
+
+    if (dispatchMl && createdIds.length > 0) {
+      try {
+        aiDispatch = await FraudDispatchService.dispatchExpenses(
+          actor,
+          createdIds,
+          "import",
+        );
+      } catch (error: any) {
+        aiDispatch = {
+          success: false,
+          message: error.message ?? "Failed to dispatch expenses to AI",
+        };
+      }
+    }
+
     return {
       filename: path.basename(filePath),
       totalRows: rows.length,
@@ -355,6 +491,7 @@ export class ImportService {
       failedRows: errors.length,
       successes,
       errors,
+      aiDispatch,
     };
   }
 }

@@ -30,6 +30,17 @@ export class VendorService {
       status?: "active" | "inactive" | "blacklisted";
     },
   ) {
+    const existing = await prisma.vendor.findFirst({
+      where: {
+        companyId: actor.companyId,
+        vendorName: input.vendorName,
+      },
+    });
+
+    if (existing) {
+      throw new AppError("Vendor already exists", 409, "VENDOR_ALREADY_EXISTS");
+    }
+
     const vendor = await prisma.vendor.create({
       data: {
         companyId: actor.companyId,
@@ -70,6 +81,26 @@ export class VendorService {
 
     if (!existing) {
       throw new AppError("Vendor not found", 404, "VENDOR_NOT_FOUND");
+    }
+
+    if (input.vendorName && input.vendorName !== existing.vendorName) {
+      const duplicate = await prisma.vendor.findFirst({
+        where: {
+          companyId: actor.companyId,
+          vendorName: input.vendorName,
+          NOT: {
+            id: existing.id,
+          },
+        },
+      });
+
+      if (duplicate) {
+        throw new AppError(
+          "Vendor already exists",
+          409,
+          "VENDOR_ALREADY_EXISTS",
+        );
+      }
     }
 
     const updated = await prisma.vendor.update({

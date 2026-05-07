@@ -398,12 +398,6 @@ export class ProcurementService {
     actor: { userId: string; companyId: string },
     id: string,
   ) {
-    return FraudDispatchService.dispatchProcurementForCompany(
-      actor.companyId,
-      id,
-      actor.userId,
-      "manual_dispatch",
-      "supervised",
-    );
+    return FraudDispatchService.dispatchProcurements(actor, [id], "manual");
   }
 }

@@ -266,4 +266,17 @@ router.post(
   ImportController.importExpenses,
 );
 
+// Callback Fraud from Python Service
+router.post(
+  "/api/internal/fraud-results",
+  internalApiKeyMiddleware,
+  FraudIntegrationController.insertSingle,
+);
+
+router.post(
+  "/api/internal/fraud-results/batch",
+  internalApiKeyMiddleware,
+  FraudIntegrationController.insertBatch,
+);
+
 export default router;

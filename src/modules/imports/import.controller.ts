@@ -20,6 +20,10 @@ export class ImportController {
 
       const parsed = importQuerySchema.parse(req.query);
 
+      const mapping = req.body.mapping
+        ? JSON.parse(req.body.mapping)
+        : undefined;
+
       const result = await ImportService.importProcurements(
         {
           userId: req.auth.userId,
@@ -27,6 +31,7 @@ export class ImportController {
         },
         req.file.path,
         parsed.dispatchMl,
+        mapping,
       );
 
       return res.status(201).json({
@@ -49,12 +54,20 @@ export class ImportController {
         throw new AppError("File is required", 400, "FILE_REQUIRED");
       }
 
+      const mapping = req.body.mapping
+        ? JSON.parse(req.body.mapping)
+        : undefined;
+
+      const dispatchMl = req.query.dispatchMl === "true";
+
       const result = await ImportService.importExpenses(
         {
           userId: req.auth.userId,
           companyId: req.auth.companyId,
         },
         req.file.path,
+        dispatchMl,
+        mapping,
       );
 
       return res.status(201).json({

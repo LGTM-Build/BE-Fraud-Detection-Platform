@@ -1,6 +1,8 @@
 import { prisma } from "../../../lib/prisma";
 import { AppError } from "../../../core/errors/app-error";
 
+const DEFAULT_ANALYSIS_TYPE = "supervised" as const;
+
 function mapReasonsToFlagsArray(reasons: string[] = []) {
   const flags = new Set<string>();
 
@@ -9,7 +11,7 @@ function mapReasonsToFlagsArray(reasons: string[] = []) {
 
     if (lower.includes("duplicate")) flags.add("Duplicate Invoice");
     if (lower.includes("self approval")) flags.add("Self Approval");
-    if (lower.includes("vendor sangat baru")) flags.add("Vendor Baru");
+    if (lower.includes("vendor")) flags.add("Vendor Risk");
     if (lower.includes("markup")) flags.add("Price Markup");
     if (lower.includes("shell")) flags.add("Shell Company");
     if (lower.includes("inflated")) flags.add("Inflated Amount");
@@ -38,35 +40,66 @@ function riskLevelToStatus(
   }
 }
 
+function getFraudScore(input: {
+  scores?: Record<string, number>;
+  fraudScore?: number;
+}) {
+  return (
+    input.fraudScore ??
+    input.scores?.fraudScore ??
+    input.scores?.ensemble ??
+    null
+  );
+}
+
+type CallbackItem = {
+  module?: "procurement" | "expense";
+
+  id?: string;
+
+  procurementId?: string;
+  purchaseId?: string;
+
+  expenseDbId?: string;
+  expenseId?: string;
+
+  scores?: Record<string, number>;
+  fraudScore?: number;
+
+  riskLevel?: "HIGH" | "MEDIUM" | "LOW" | "SAFE";
+  predictedFraud?: boolean;
+
+  reasons?: string[];
+  aiExplanation?: string;
+
+  raw?: unknown;
+};
+
 export class FraudIntegrationService {
-  static async insertSingle(input: {
-    analysisType: "supervised" | "anomaly";
-    generatedAt?: string;
-    procurementId?: string;
-    expenseId?: string;
-    purchaseId?: string;
-    expenseCode?: string;
-    transactionType?: "procurement" | "expense";
-    scores?: Record<string, number>;
-    riskLevel?: "HIGH" | "MEDIUM" | "LOW" | "SAFE";
-    predictedFraud?: boolean;
-    reasons?: string[];
-  }) {
-    const fraudScore =
-      input.scores?.fraudScore ?? input.scores?.ensemble ?? null;
+  static async insertSingle(input: CallbackItem & { generatedAt?: string }) {
+    const module =
+      input.module ??
+      (input.expenseId || input.expenseDbId ? "expense" : "procurement");
 
+    const fraudScore = getFraudScore(input);
     const flags = mapReasonsToFlagsArray(input.reasons ?? []);
-    const aiExplanation = input.reasons?.join(". ") ?? null;
+    const aiExplanation =
+      input.aiExplanation ?? input.reasons?.join(". ") ?? null;
     const mappedStatus = riskLevelToStatus(input.riskLevel);
+    const completedAt = input.generatedAt
+      ? new Date(input.generatedAt)
+      : new Date();
 
-    if (input.transactionType === "expense") {
-      let expense = null;
-
-      if (input.expenseId) {
-        expense = await prisma.expense.findUnique({
-          where: { id: input.expenseId },
-        });
-      }
+    if (module === "expense") {
+      const expense = await prisma.expense.findFirst({
+        where: {
+          OR: [
+            ...(input.id ? [{ id: input.id }] : []),
+            ...(input.expenseDbId ? [{ id: input.expenseDbId }] : []),
+            ...(input.expenseId ? [{ expenseId: input.expenseId }] : []),
+          ],
+        },
+      });
 
       if (!expense) {
         throw new AppError("Expense not found", 404, "EXPENSE_NOT_FOUND");
@@ -76,20 +109,18 @@ export class FraudIntegrationService {
         data: {
           companyId: expense.companyId,
           expenseId: expense.id,
-          analysisType: input.analysisType,
+          analysisType: DEFAULT_ANALYSIS_TYPE,
           status: "completed",
           isFraud: input.predictedFraud ?? null,
           fraudScore,
           flags,
           aiExplanation,
           features: {
-            reasons: input.reasons,
-            riskLevel: input.riskLevel,
+            reasons: input.reasons ?? [],
+            riskLevel: input.riskLevel ?? null,
           },
-          rawResponse: input,
-          completedAt: input.generatedAt
-            ? new Date(input.generatedAt)
-            : new Date(),
+          rawResponse: input.raw ?? input,
+          completedAt,
         },
       });
 
@@ -106,17 +137,15 @@ export class FraudIntegrationService {
       return result;
     }
 
-    let procurement = null;
-
-    if (input.procurementId) {
-      procurement = await prisma.procurementTransaction.findUnique({
-        where: { id: input.procurementId },
-      });
-    } else if (input.purchaseId) {
-      procurement = await prisma.procurementTransaction.findFirst({
-        where: { purchaseId: input.purchaseId },
-      });
-    }
+    const procurement = await prisma.procurementTransaction.findFirst({
+      where: {
+        OR: [
+          ...(input.id ? [{ id: input.id }] : []),
+          ...(input.procurementId ? [{ id: input.procurementId }] : []),
+          ...(input.purchaseId ? [{ purchaseId: input.purchaseId }] : []),
+        ],
+      },
+    });
 
     if (!procurement) {
       throw new AppError("Procurement not found", 404, "PROCUREMENT_NOT_FOUND");
@@ -126,20 +155,18 @@ export class FraudIntegrationService {
       data: {
         companyId: procurement.companyId,
         procurementId: procurement.id,
-        analysisType: input.analysisType,
+        analysisType: DEFAULT_ANALYSIS_TYPE,
         status: "completed",
         isFraud: input.predictedFraud ?? null,
         fraudScore,
         flags,
         aiExplanation,
         features: {
-          reasons: input.reasons,
-          riskLevel: input.riskLevel,
+          reasons: input.reasons ?? [],
+          riskLevel: input.riskLevel ?? null,
         },
-        rawResponse: input,
-        completedAt: input.generatedAt
-          ? new Date(input.generatedAt)
-          : new Date(),
+        rawResponse: input.raw ?? input,
+        completedAt,
       },
     });
 
@@ -154,5 +181,54 @@ export class FraudIntegrationService {
     });
 
     return result;
+  }
+
+  static async insertBatch(input: {
+    module?: "procurement" | "expense";
+    generatedAt?: string;
+    results?: CallbackItem[];
+    samplePredictions?: CallbackItem[];
+  }) {
+    const rows = input.results ?? input.samplePredictions ?? [];
+
+    const successes: Array<{
+      index: number;
+      id: string;
+    }> = [];
+
+    const errors: Array<{
+      index: number;
+      message: string;
+    }> = [];
+
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index];
+
+      try {
+        const result = await this.insertSingle({
+          ...row,
+          module: row.module ?? input.module,
+          generatedAt: input.generatedAt,
+        });
+
+        successes.push({
+          index,
+          id: result.id,
+        });
+      } catch (error: any) {
+        errors.push({
+          index,
+          message: error.message ?? "Unknown callback error",
+        });
+      }
+    }
+
+    return {
+      totalRows: rows.length,
+      successRows: successes.length,
+      failedRows: errors.length,
+      successes,
+      errors,
+    };
   }
 }
