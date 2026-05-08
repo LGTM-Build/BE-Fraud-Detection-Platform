@@ -54,12 +54,12 @@ router.get("/api/dashboard/high-alerts", auth_middleware_1.authMiddleware, (0, r
 router.get("/api/dashboard/latest-transactions", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), dashboard_controller_1.DashboardController.latestTransactions);
 router.get("/api/dashboard/fraud-trend", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), dashboard_controller_1.DashboardController.fraudTrend);
 // Procurement monitor
-router.get("/api/procurement-transactions", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), procurement_controller_1.ProcurementController.listTransactions);
-router.get("/api/procurement-transactions/:id", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), procurement_controller_1.ProcurementController.detailTransaction);
-router.post("/api/procurement-transactions", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user"]), procurement_controller_1.ProcurementController.createTransaction);
-router.put("/api/procurement-transactions/:id", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user"]), procurement_controller_1.ProcurementController.updateTransaction);
-router.patch("/api/procurement-transactions/:id/status", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), procurement_controller_1.ProcurementController.updateTransactionStatus);
-router.get("/api/procurement-monitor", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), procurement_controller_1.ProcurementController.listMonitor);
+router.get("/api/procurement-monitor", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), procurement_controller_1.ProcurementController.listTransactions);
+router.get("/api/procurement-monitor/:id", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), procurement_controller_1.ProcurementController.detailTransaction);
+router.post("/api/procurements", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user"]), procurement_controller_1.ProcurementController.createTransaction);
+router.put("/api/procurements/:id", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user"]), procurement_controller_1.ProcurementController.updateTransaction);
+router.patch("/api/procurements/:id/review", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), procurement_controller_1.ProcurementController.updateTransactionStatus);
+router.post("/api/procurement-monitor/:id/dispatch-ml", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), procurement_controller_1.ProcurementController.dispatchMl);
 // Expense monitor
 router.get("/api/expense-monitor", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), expense_controller_1.ExpenseController.listMonitor);
 router.get("/api/expense-monitor/:id", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), expense_controller_1.ExpenseController.detailMonitor);
