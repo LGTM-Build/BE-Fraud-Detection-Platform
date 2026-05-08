@@ -182,35 +182,35 @@ router.get(
   "/api/procurement-monitor",
   authMiddleware,
   requireRole(["super_admin", "super_user", "auditor"]),
-  ProcurementController.listMonitor,
+  ProcurementController.listTransactions,
 );
 
 router.get(
   "/api/procurement-monitor/:id",
   authMiddleware,
   requireRole(["super_admin", "super_user", "auditor"]),
-  ProcurementController.detailMonitor,
+  ProcurementController.detailTransaction,
 );
 
 router.post(
   "/api/procurements",
   authMiddleware,
   requireRole(["super_admin", "super_user"]),
-  ProcurementController.create,
+  ProcurementController.createTransaction,
 );
 
 router.put(
   "/api/procurements/:id",
   authMiddleware,
   requireRole(["super_admin", "super_user"]),
-  ProcurementController.update,
+  ProcurementController.updateTransaction,
 );
 
-router.post(
-  "/api/procurement-monitor/:id/review",
+router.patch(
+  "/api/procurements/:id/review",
   authMiddleware,
   requireRole(["super_admin", "super_user", "auditor"]),
-  ProcurementController.review,
+  ProcurementController.updateTransactionStatus,
 );
 
 router.post(

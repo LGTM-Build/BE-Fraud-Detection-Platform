@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const procurementMethodEnum = z.enum([
+export const procurementMethodEnum = z.enum([
   "pengadaan_langsung",
   "tender_terbuka",
   "tender_tertutup",
@@ -9,7 +9,7 @@ const procurementMethodEnum = z.enum([
   "lainnya",
 ]);
 
-const reviewStatusEnum = z.enum([
+export const reviewStatusEnum = z.enum([
   "pending",
   "alert",
   "high_alert",
@@ -45,4 +45,44 @@ export const listProcurementMonitorQuerySchema = z.object({
   dateTo: z.string().optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+/**
+ * FE bisa kirim:
+ * ?status=pending,alert,high_alert
+ * ?businessUnit=IT
+ * ?search=vendor/item
+ * ?page=1
+ * ?limit=20
+ */
+export const listProcurementTransactionsQuerySchema = z.object({
+  status: z
+    .string()
+    .optional()
+    .transform((value) => {
+      if (!value) return undefined;
+
+      return value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    })
+    .pipe(z.array(reviewStatusEnum).optional()),
+
+  businessUnit: z.string().optional(),
+  department: z.string().optional(),
+
+  search: z.string().optional(),
+  searchVendor: z.string().optional(),
+  searchItem: z.string().optional(),
+
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export const updateProcurementStatusSchema = z.object({
+  status: z.enum(["approved", "rejected"]),
 });

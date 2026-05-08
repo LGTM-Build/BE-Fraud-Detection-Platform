@@ -35,6 +35,14 @@ class AuthService {
                     role: "super_user",
                 },
             });
+            const employee = await tx.employee.create({
+                data: {
+                    companyId: company.id,
+                    fullName: input.fullName,
+                    phoneNumber: "08000000000",
+                    position: "Owner",
+                },
+            });
             const session = await tx.userSession.create({
                 data: {
                     companyId: company.id,
@@ -79,6 +87,7 @@ class AuthService {
             return {
                 company,
                 user,
+                employee,
                 accessToken,
                 refreshToken,
             };

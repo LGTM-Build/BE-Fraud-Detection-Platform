@@ -17,9 +17,17 @@ function normalizeFlags(flags) {
     }
     return [];
 }
+function decimalToNumber(value) {
+    if (value === null || value === undefined)
+        return 0;
+    if (typeof value === "object" && "toNumber" in value) {
+        return value.toNumber();
+    }
+    return Number(value);
+}
 function procurementMethodLabel(method) {
     const map = {
-        pengadaan_langsung: "Penunjukan Langsung",
+        pengadaan_langsung: "Pengadaan Langsung",
         tender_terbuka: "Tender Terbuka",
         tender_tertutup: "Tender Tertutup",
         e_purchasing: "E-Purchasing",
@@ -27,6 +35,34 @@ function procurementMethodLabel(method) {
         lainnya: "Lainnya",
     };
     return map[method];
+}
+function formatDate(date) {
+    return new Intl.DateTimeFormat("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    }).format(date);
+}
+function serializeProcurement(item) {
+    const amount = decimalToNumber(item.amountTotal);
+    return {
+        id: item.id,
+        purchaseId: item.purchaseId,
+        purchaseDate: formatDate(item.purchaseDate),
+        vendorName: item.vendorName,
+        itemDescription: item.itemDescription,
+        department: item.department,
+        requester: item.createdByUser.fullName,
+        approver: item.updatedByUser?.fullName ?? "-",
+        amount,
+        fraudScore: item.fraudScore ?? 0,
+        flags: normalizeFlags(item.flags),
+        status: item.status,
+        procurementMethod: procurementMethodLabel(item.procurementMethod),
+        aiExplanation: item.aiExplanation ?? "Belum ada analisis AI.",
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+    };
 }
 class ProcurementService {
     static async create(actor, input) {
@@ -62,21 +98,27 @@ class ProcurementService {
     }
     static async update(actor, id, input) {
         const existing = await prisma_1.prisma.procurementTransaction.findFirst({
-            where: { id, companyId: actor.companyId },
+            where: {
+                companyId: actor.companyId,
+                OR: [{ id }, { purchaseId: id }],
+            },
         });
         if (!existing) {
             throw new app_error_1.AppError("Procurement not found", 404, "PROCUREMENT_NOT_FOUND");
         }
         if (input.employeeId) {
             const employee = await prisma_1.prisma.employee.findFirst({
-                where: { id: input.employeeId, companyId: actor.companyId },
+                where: {
+                    id: input.employeeId,
+                    companyId: actor.companyId,
+                },
             });
             if (!employee) {
                 throw new app_error_1.AppError("Employee not found", 404, "EMPLOYEE_NOT_FOUND");
             }
         }
         return prisma_1.prisma.procurementTransaction.update({
-            where: { id },
+            where: { id: existing.id },
             data: {
                 employeeId: input.employeeId === undefined
                     ? existing.employeeId
@@ -238,7 +280,10 @@ class ProcurementService {
     }
     static async detailMonitor(companyId, id) {
         const item = await prisma_1.prisma.procurementTransaction.findFirst({
-            where: { id, companyId },
+            where: {
+                companyId,
+                OR: [{ id }, { purchaseId: id }],
+            },
             include: {
                 employee: {
                     select: {
@@ -302,13 +347,16 @@ class ProcurementService {
     }
     static async review(actor, id, input) {
         const existing = await prisma_1.prisma.procurementTransaction.findFirst({
-            where: { id, companyId: actor.companyId },
+            where: {
+                companyId: actor.companyId,
+                OR: [{ id }, { purchaseId: id }],
+            },
         });
         if (!existing) {
             throw new app_error_1.AppError("Procurement not found", 404, "PROCUREMENT_NOT_FOUND");
         }
         return prisma_1.prisma.procurementTransaction.update({
-            where: { id },
+            where: { id: existing.id },
             data: {
                 status: input.status,
                 updatedBy: actor.userId,
@@ -317,6 +365,253 @@ class ProcurementService {
     }
     static async dispatchMl(actor, id) {
         return fraud_dispatch_service_1.FraudDispatchService.dispatchProcurements(actor, [id], "manual");
+    }
+    static async listTransactionsForFE(companyId, query) {
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 100;
+        const skip = (page - 1) * limit;
+        const department = query.department ?? query.businessUnit;
+        const search = query.search?.trim();
+        const where = {
+            companyId,
+            ...(query.status?.length
+                ? {
+                    status: {
+                        in: query.status,
+                    },
+                }
+                : {}),
+            ...(department && department !== "all"
+                ? {
+                    department,
+                }
+                : {}),
+            ...(query.searchVendor
+                ? {
+                    vendorName: {
+                        contains: query.searchVendor,
+                    },
+                }
+                : {}),
+            ...(query.searchItem
+                ? {
+                    itemDescription: {
+                        contains: query.searchItem,
+                    },
+                }
+                : {}),
+            ...(search
+                ? {
+                    OR: [
+                        {
+                            vendorName: {
+                                contains: search,
+                            },
+                        },
+                        {
+                            itemDescription: {
+                                contains: search,
+                            },
+                        },
+                        {
+                            purchaseId: {
+                                contains: search,
+                            },
+                        },
+                        {
+                            department: {
+                                contains: search,
+                            },
+                        },
+                    ],
+                }
+                : {}),
+            ...(query.dateFrom || query.dateTo
+                ? {
+                    purchaseDate: {
+                        ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+                        ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+                    },
+                }
+                : {}),
+        };
+        const [items, total, grouped] = await Promise.all([
+            prisma_1.prisma.procurementTransaction.findMany({
+                where,
+                include: {
+                    employee: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            department: true,
+                            position: true,
+                            externalRef: true,
+                        },
+                    },
+                    createdByUser: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            email: true,
+                            role: true,
+                        },
+                    },
+                    updatedByUser: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            email: true,
+                            role: true,
+                        },
+                    },
+                },
+                orderBy: {
+                    purchaseDate: "desc",
+                },
+                skip,
+                take: limit,
+            }),
+            prisma_1.prisma.procurementTransaction.count({
+                where,
+            }),
+            prisma_1.prisma.procurementTransaction.groupBy({
+                by: ["status"],
+                where: {
+                    companyId,
+                },
+                _count: {
+                    status: true,
+                },
+            }),
+        ]);
+        const summary = {
+            all: grouped.reduce((acc, item) => acc + item._count.status, 0),
+            pending: grouped.find((item) => item.status === "pending")?._count.status ?? 0,
+            alert: grouped.find((item) => item.status === "alert")?._count.status ?? 0,
+            high_alert: grouped.find((item) => item.status === "high_alert")?._count.status ??
+                0,
+            auto_approved: grouped.find((item) => item.status === "auto_approved")?._count
+                .status ?? 0,
+            approved: grouped.find((item) => item.status === "approved")?._count.status ?? 0,
+            rejected: grouped.find((item) => item.status === "rejected")?._count.status ?? 0,
+        };
+        return {
+            items: items.map(serializeProcurement),
+            meta: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+            },
+            summary,
+        };
+    }
+    static async detailTransactionForFE(companyId, id) {
+        const item = await prisma_1.prisma.procurementTransaction.findFirst({
+            where: {
+                companyId,
+                OR: [{ id }, { purchaseId: id }],
+            },
+            include: {
+                employee: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        department: true,
+                        position: true,
+                        externalRef: true,
+                    },
+                },
+                createdByUser: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        role: true,
+                    },
+                },
+                updatedByUser: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        role: true,
+                    },
+                },
+            },
+        });
+        if (!item) {
+            throw new app_error_1.AppError("Procurement not found", 404, "PROCUREMENT_NOT_FOUND");
+        }
+        return serializeProcurement(item);
+    }
+    static async updateTransactionStatusForFE(actor, id, input) {
+        const existing = await prisma_1.prisma.procurementTransaction.findFirst({
+            where: {
+                companyId: actor.companyId,
+                OR: [{ id }, { purchaseId: id }],
+            },
+        });
+        if (!existing) {
+            throw new app_error_1.AppError("Procurement not found", 404, "PROCUREMENT_NOT_FOUND");
+        }
+        if (existing.status === "approved" ||
+            existing.status === "rejected" ||
+            existing.status === "auto_approved") {
+            throw new app_error_1.AppError("Procurement transaction has already been reviewed", 409, "PROCUREMENT_ALREADY_REVIEWED");
+        }
+        const updated = await prisma_1.prisma.procurementTransaction.update({
+            where: {
+                id: existing.id,
+            },
+            data: {
+                status: input.status,
+                updatedBy: actor.userId,
+            },
+            include: {
+                employee: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        department: true,
+                        position: true,
+                        externalRef: true,
+                    },
+                },
+                createdByUser: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        role: true,
+                    },
+                },
+                updatedByUser: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        role: true,
+                    },
+                },
+            },
+        });
+        await prisma_1.prisma.auditLog.create({
+            data: {
+                companyId: actor.companyId,
+                userId: actor.userId,
+                action: `PROCUREMENT_${input.status.toUpperCase()}`,
+                targetType: "procurement_transaction",
+                targetId: existing.id,
+                note: `Procurement transaction ${input.status}`,
+                metadata: {
+                    previousStatus: existing.status,
+                    newStatus: input.status,
+                    purchaseId: existing.purchaseId,
+                },
+            },
+        });
+        return serializeProcurement(updated);
     }
 }
 exports.ProcurementService = ProcurementService;
