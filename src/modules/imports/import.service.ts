@@ -96,7 +96,24 @@ function parseNumber(value?: string | number | null): number | null {
     return Number.isNaN(value) ? null : value;
   }
 
-  const normalized = String(value).trim().replace(/\./g, "").replace(/,/g, ".");
+  const raw = String(value).trim().replace(/\s/g, "");
+
+  if (!raw) return null;
+
+  const lastDot = raw.lastIndexOf(".");
+  const lastComma = raw.lastIndexOf(",");
+
+  let normalized = raw;
+
+  if (lastDot !== -1 && lastComma !== -1) {
+    if (lastDot > lastComma) {
+      normalized = raw.replace(/,/g, "");
+    } else {
+      normalized = raw.replace(/\./g, "").replace(/,/g, ".");
+    }
+  } else if (lastComma !== -1) {
+    normalized = raw.replace(/,/g, ".");
+  }
 
   const parsed = Number(normalized);
 

@@ -30,6 +30,14 @@ function categoryLabel(category: ExpenseCategory) {
   return map[category];
 }
 
+function isReviewedStatus(status: ReviewStatus) {
+  return (
+    status === "approved" ||
+    status === "rejected" ||
+    status === "auto_approved"
+  );
+}
+
 export class ExpenseService {
   static async create(
     actor: { userId: string; companyId: string },
@@ -158,7 +166,7 @@ export class ExpenseService {
       prisma.expense.count({ where }),
       prisma.expense.groupBy({
         by: ["status"],
-        where: { companyId },
+        where,
         _count: { status: true },
       }),
     ]);
@@ -320,6 +328,14 @@ export class ExpenseService {
 
     if (!existing) {
       throw new AppError("Expense not found", 404, "EXPENSE_NOT_FOUND");
+    }
+
+    if (isReviewedStatus(existing.status)) {
+      throw new AppError(
+        "Expense has already been reviewed",
+        409,
+        "EXPENSE_ALREADY_REVIEWED",
+      );
     }
 
     return prisma.expense.update({

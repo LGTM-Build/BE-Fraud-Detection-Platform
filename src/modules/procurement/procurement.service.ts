@@ -42,6 +42,14 @@ function procurementMethodLabel(method: ProcurementMethod) {
   return map[method];
 }
 
+function isReviewedStatus(status: ReviewStatus) {
+  return (
+    status === "approved" ||
+    status === "rejected" ||
+    status === "auto_approved"
+  );
+}
+
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("id-ID", {
     day: "2-digit",
@@ -82,6 +90,9 @@ type ProcurementWithRelations = Prisma.ProcurementTransactionGetPayload<{
 
 function serializeProcurement(item: ProcurementWithRelations) {
   const amount = decimalToNumber(item.amountTotal);
+  const approver = isReviewedStatus(item.status)
+    ? item.updatedByUser?.fullName ?? "-"
+    : "-";
 
   return {
     id: item.id,
@@ -91,7 +102,7 @@ function serializeProcurement(item: ProcurementWithRelations) {
     itemDescription: item.itemDescription,
     department: item.department,
     requester: item.createdByUser.fullName,
-    approver: item.updatedByUser?.fullName ?? "-",
+    approver,
     amount,
     fraudScore: item.fraudScore ?? 0,
     flags: normalizeFlags(item.flags),
@@ -300,7 +311,7 @@ export class ProcurementService {
       prisma.procurementTransaction.count({ where }),
       prisma.procurementTransaction.groupBy({
         by: ["status"],
-        where: { companyId },
+        where,
         _count: { status: true },
       }),
     ]);
@@ -443,8 +454,10 @@ export class ProcurementService {
         vendorName: item.vendorName,
         itemDescription: item.itemDescription,
         department: item.department,
-        requester: item.employee?.fullName ?? null,
-        approver: item.updatedByUser?.fullName ?? null,
+        requester: item.createdByUser.fullName,
+        approver: isReviewedStatus(item.status)
+          ? item.updatedByUser?.fullName ?? null
+          : null,
         procurementMethod: item.procurementMethod,
         procurementMethodLabel: procurementMethodLabel(item.procurementMethod),
         amountTotal: item.amountTotal,
@@ -470,6 +483,14 @@ export class ProcurementService {
       throw new AppError("Procurement not found", 404, "PROCUREMENT_NOT_FOUND");
     }
 
+    if (isReviewedStatus(existing.status)) {
+      throw new AppError(
+        "Procurement transaction has already been reviewed",
+        409,
+        "PROCUREMENT_ALREADY_REVIEWED",
+      );
+    }
+
     return prisma.procurementTransaction.update({
       where: { id: existing.id },
       data: {
@@ -483,7 +504,25 @@ export class ProcurementService {
     actor: { userId: string; companyId: string },
     id: string,
   ) {
-    return FraudDispatchService.dispatchProcurements(actor, [id], "manual");
+    const existing = await prisma.procurementTransaction.findFirst({
+      where: {
+        companyId: actor.companyId,
+        OR: [{ id }, { purchaseId: id }],
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!existing) {
+      throw new AppError("Procurement not found", 404, "PROCUREMENT_NOT_FOUND");
+    }
+
+    return FraudDispatchService.dispatchProcurements(
+      actor,
+      [existing.id],
+      "manual",
+    );
   }
 
   static async listTransactionsForFE(
@@ -621,9 +660,7 @@ export class ProcurementService {
 
       prisma.procurementTransaction.groupBy({
         by: ["status"],
-        where: {
-          companyId,
-        },
+        where,
         _count: {
           status: true,
         },

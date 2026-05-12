@@ -70,6 +70,13 @@ export class AuthService {
         },
       });
 
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          employeeId: employee.id,
+        },
+      });
+
       const session = await tx.userSession.create({
         data: {
           companyId: company.id,
@@ -119,7 +126,10 @@ export class AuthService {
 
       return {
         company,
-        user,
+        user: {
+          ...user,
+          employeeId: employee.id,
+        },
         employee,
         accessToken,
         refreshToken,

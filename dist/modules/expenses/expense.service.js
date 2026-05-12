@@ -28,6 +28,11 @@ function categoryLabel(category) {
     };
     return map[category];
 }
+function isReviewedStatus(status) {
+    return (status === "approved" ||
+        status === "rejected" ||
+        status === "auto_approved");
+}
 class ExpenseService {
     static async create(actor, input) {
         const employee = await prisma_1.prisma.employee.findFirst({
@@ -126,7 +131,7 @@ class ExpenseService {
             prisma_1.prisma.expense.count({ where }),
             prisma_1.prisma.expense.groupBy({
                 by: ["status"],
-                where: { companyId },
+                where,
                 _count: { status: true },
             }),
         ]);
@@ -265,6 +270,9 @@ class ExpenseService {
         });
         if (!existing) {
             throw new app_error_1.AppError("Expense not found", 404, "EXPENSE_NOT_FOUND");
+        }
+        if (isReviewedStatus(existing.status)) {
+            throw new app_error_1.AppError("Expense has already been reviewed", 409, "EXPENSE_ALREADY_REVIEWED");
         }
         return prisma_1.prisma.expense.update({
             where: { id },
