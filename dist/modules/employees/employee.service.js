@@ -4,6 +4,13 @@ exports.EmployeeService = void 0;
 const prisma_1 = require("../../lib/prisma");
 const app_error_1 = require("../../core/errors/app-error");
 const audit_log_service_1 = require("../audit-logs/audit-log.service");
+const client_1 = require("@prisma/client");
+function normalizeOptionalText(value) {
+    if (value === undefined || value === null)
+        return null;
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+}
 class EmployeeService {
     static async list(companyId) {
         return prisma_1.prisma.employee.findMany({
@@ -21,27 +28,40 @@ class EmployeeService {
         return employee;
     }
     static async create(actor, input) {
-        if (input.externalRef) {
+        const department = normalizeOptionalText(input.department);
+        const position = normalizeOptionalText(input.position);
+        const externalRef = normalizeOptionalText(input.externalRef);
+        if (externalRef) {
             const duplicate = await prisma_1.prisma.employee.findFirst({
                 where: {
                     companyId: actor.companyId,
-                    externalRef: input.externalRef,
+                    externalRef,
                 },
             });
             if (duplicate) {
                 throw new app_error_1.AppError("External ref already exists", 409, "EMPLOYEE_EXTERNAL_REF_EXISTS");
             }
         }
-        const employee = await prisma_1.prisma.employee.create({
-            data: {
-                companyId: actor.companyId,
-                fullName: input.fullName,
-                phoneNumber: input.phoneNumber,
-                department: input.department ?? null,
-                position: input.position ?? null,
-                externalRef: input.externalRef ?? null,
-            },
-        });
+        let employee;
+        try {
+            employee = await prisma_1.prisma.employee.create({
+                data: {
+                    companyId: actor.companyId,
+                    fullName: input.fullName,
+                    phoneNumber: input.phoneNumber,
+                    department,
+                    position,
+                    externalRef,
+                },
+            });
+        }
+        catch (error) {
+            if (error instanceof client_1.Prisma.PrismaClientKnownRequestError &&
+                error.code === "P2002") {
+                throw new app_error_1.AppError("External ref already exists", 409, "EMPLOYEE_EXTERNAL_REF_EXISTS");
+            }
+            throw error;
+        }
         await audit_log_service_1.AuditLogService.create({
             companyId: actor.companyId,
             userId: actor.userId,
@@ -63,33 +83,48 @@ class EmployeeService {
         if (!existing) {
             throw new app_error_1.AppError("Employee not found", 404, "EMPLOYEE_NOT_FOUND");
         }
-        if (input.externalRef && input.externalRef !== existing.externalRef) {
+        const department = input.department === undefined
+            ? existing.department
+            : normalizeOptionalText(input.department);
+        const position = input.position === undefined
+            ? existing.position
+            : normalizeOptionalText(input.position);
+        const nextExternalRef = input.externalRef === undefined
+            ? existing.externalRef
+            : normalizeOptionalText(input.externalRef);
+        if (nextExternalRef && nextExternalRef !== existing.externalRef) {
             const duplicate = await prisma_1.prisma.employee.findFirst({
                 where: {
                     companyId: actor.companyId,
-                    externalRef: input.externalRef,
+                    externalRef: nextExternalRef,
                 },
             });
             if (duplicate) {
                 throw new app_error_1.AppError("External ref already exists", 409, "EMPLOYEE_EXTERNAL_REF_EXISTS");
             }
         }
-        const updated = await prisma_1.prisma.employee.update({
-            where: { id: existing.id },
-            data: {
-                fullName: input.fullName ?? existing.fullName,
-                phoneNumber: input.phoneNumber === undefined || input.phoneNumber === "undefined"
-                    ? existing.phoneNumber
-                    : input.phoneNumber,
-                department: input.department === undefined
-                    ? existing.department
-                    : input.department,
-                position: input.position === undefined ? existing.position : input.position,
-                externalRef: input.externalRef === undefined
-                    ? existing.externalRef
-                    : input.externalRef,
-            },
-        });
+        let updated;
+        try {
+            updated = await prisma_1.prisma.employee.update({
+                where: { id: existing.id },
+                data: {
+                    fullName: input.fullName ?? existing.fullName,
+                    phoneNumber: input.phoneNumber === undefined || input.phoneNumber === "undefined"
+                        ? existing.phoneNumber
+                        : input.phoneNumber,
+                    department,
+                    position,
+                    externalRef: nextExternalRef,
+                },
+            });
+        }
+        catch (error) {
+            if (error instanceof client_1.Prisma.PrismaClientKnownRequestError &&
+                error.code === "P2002") {
+                throw new app_error_1.AppError("External ref already exists", 409, "EMPLOYEE_EXTERNAL_REF_EXISTS");
+            }
+            throw error;
+        }
         await audit_log_service_1.AuditLogService.create({
             companyId: actor.companyId,
             userId: actor.userId,
