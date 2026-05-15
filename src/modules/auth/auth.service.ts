@@ -14,7 +14,7 @@ import {
 import { AuditLogService } from "../audit-logs/audit-log.service";
 
 function getRefreshTokenExpiryDate() {
-  return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  return new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 }
 
 export class AuthService {

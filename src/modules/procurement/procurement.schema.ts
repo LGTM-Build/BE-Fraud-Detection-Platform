@@ -56,6 +56,8 @@ export const listProcurementMonitorQuerySchema = z.object({
  * ?limit=20
  */
 export const listProcurementTransactionsQuerySchema = z.object({
+  view: z.enum(["needs_review", "waiting_ai", "history"]).optional(),
+
   status: z
     .string()
     .optional()
@@ -65,6 +67,7 @@ export const listProcurementTransactionsQuerySchema = z.object({
       return value
         .split(",")
         .map((item) => item.trim())
+        .map((item) => item.replace(/-/g, "_"))
         .filter(Boolean);
     })
     .pipe(z.array(reviewStatusEnum).optional()),

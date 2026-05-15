@@ -61,10 +61,11 @@ router.put("/api/procurements/:id", auth_middleware_1.authMiddleware, (0, requir
 router.patch("/api/procurements/:id/review", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), procurement_controller_1.ProcurementController.updateTransactionStatus);
 router.post("/api/procurement-monitor/:id/dispatch-ml", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), procurement_controller_1.ProcurementController.dispatchMl);
 // Expense monitor
-router.get("/api/expense-monitor", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), expense_controller_1.ExpenseController.listMonitor);
-router.get("/api/expense-monitor/:id", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), expense_controller_1.ExpenseController.detailMonitor);
+router.get("/api/expense-monitor", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), expense_controller_1.ExpenseController.listTransactions);
+router.get("/api/expense-monitor/:id", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), expense_controller_1.ExpenseController.detailTransaction);
 router.post("/api/expenses", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user"]), expense_controller_1.ExpenseController.create);
 router.post("/api/expense-monitor/:id/review", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), expense_controller_1.ExpenseController.review);
+router.patch("/api/expenses/:id/review", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user", "auditor"]), expense_controller_1.ExpenseController.updateTransactionStatus);
 // Import
 router.post("/api/imports/procurements", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user"]), upload_middleware_1.upload.single("file"), import_controller_1.ImportController.importProcurements);
 router.post("/api/imports/expenses", auth_middleware_1.authMiddleware, (0, require_role_middleware_1.requireRole)(["super_admin", "super_user"]), upload_middleware_1.upload.single("file"), import_controller_1.ImportController.importExpenses);

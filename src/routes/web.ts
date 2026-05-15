@@ -225,14 +225,14 @@ router.get(
   "/api/expense-monitor",
   authMiddleware,
   requireRole(["super_admin", "super_user", "auditor"]),
-  ExpenseController.listMonitor,
+  ExpenseController.listTransactions,
 );
 
 router.get(
   "/api/expense-monitor/:id",
   authMiddleware,
   requireRole(["super_admin", "super_user", "auditor"]),
-  ExpenseController.detailMonitor,
+  ExpenseController.detailTransaction,
 );
 
 router.post(
@@ -247,6 +247,13 @@ router.post(
   authMiddleware,
   requireRole(["super_admin", "super_user", "auditor"]),
   ExpenseController.review,
+);
+
+router.patch(
+  "/api/expenses/:id/review",
+  authMiddleware,
+  requireRole(["super_admin", "super_user", "auditor"]),
+  ExpenseController.updateTransactionStatus,
 );
 
 // Import

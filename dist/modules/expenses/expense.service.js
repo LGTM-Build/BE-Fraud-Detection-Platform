@@ -28,10 +28,90 @@ function categoryLabel(category) {
     };
     return map[category];
 }
+function decimalToNumber(value) {
+    if (value === null || value === undefined)
+        return 0;
+    if (typeof value === "object" && "toNumber" in value) {
+        return value.toNumber();
+    }
+    return Number(value);
+}
 function isReviewedStatus(status) {
     return (status === "approved" ||
         status === "rejected" ||
         status === "auto_approved");
+}
+function statusToFrontendLabel(status) {
+    const map = {
+        pending: "Menunggu AI",
+        alert: "Perlu Ditinjau",
+        high_alert: "Risiko Tinggi",
+        auto_approved: "Disetujui Otomatis",
+        approved: "Disetujui",
+        rejected: "Ditolak",
+    };
+    return map[status];
+}
+function statusToFrontendKey(status) {
+    const map = {
+        pending: "waiting_ai",
+        alert: "needs_review",
+        high_alert: "high_risk",
+        auto_approved: "auto_approved",
+        approved: "approved",
+        rejected: "rejected",
+    };
+    return map[status];
+}
+function formatDate(date) {
+    return new Intl.DateTimeFormat("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+    }).format(date);
+}
+function serializeExpense(item, index) {
+    const amount = decimalToNumber(item.amountTotal);
+    const statusLabelText = statusToFrontendLabel(item.status);
+    const statusKey = statusToFrontendKey(item.status);
+    const reviewer = item.status === "auto_approved"
+        ? "Sistem AI"
+        : item.status === "approved" || item.status === "rejected"
+            ? item.updatedByUser?.fullName ?? "Sudah direview"
+            : null;
+    return {
+        id: item.id,
+        no: index,
+        expenseId: item.expenseId,
+        displayId: item.expenseId ?? item.id,
+        shortId: item.id.slice(0, 8),
+        expenseDate: item.expenseDate.toISOString(),
+        expenseDateLabel: formatDate(item.expenseDate),
+        description: item.description,
+        merchant: item.merchant ?? "",
+        employeeId: item.employeeId,
+        employeeName: item.employee.fullName,
+        employeeDepartment: item.employee.department ?? item.department ?? "-",
+        department: item.department ?? item.employee.department ?? "-",
+        category: item.category,
+        categoryLabel: categoryLabel(item.category),
+        requesterId: item.createdByUser.id,
+        requesterName: item.createdByUser.fullName,
+        reviewerName: reviewer,
+        inputBy: item.createdByUser.fullName,
+        reviewedBy: reviewer,
+        amount,
+        amountTotal: amount,
+        fraudScore: item.fraudScore ?? 0,
+        flags: normalizeFlags(item.flags),
+        status: item.status,
+        statusKey,
+        statusLabel: statusLabelText,
+        aiExplanation: item.aiExplanation ?? "Belum ada analisis AI.",
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+    };
 }
 class ExpenseService {
     static async create(actor, input) {
@@ -281,6 +361,295 @@ class ExpenseService {
                 updatedBy: actor.userId,
             },
         });
+    }
+    static async listTransactionsForFE(companyId, query) {
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 100;
+        const skip = (page - 1) * limit;
+        const statusFromView = query.view === "needs_review"
+            ? ["alert", "high_alert"]
+            : query.view === "waiting_ai"
+                ? ["pending"]
+                : query.view === "history"
+                    ? ["approved", "auto_approved", "rejected"]
+                    : undefined;
+        const effectiveStatus = query.status?.length ? query.status : statusFromView;
+        const search = query.search?.trim();
+        const where = {
+            companyId,
+            ...(effectiveStatus?.length
+                ? {
+                    status: {
+                        in: effectiveStatus,
+                    },
+                }
+                : {}),
+            ...(query.department && query.department !== "all"
+                ? {
+                    department: query.department,
+                }
+                : {}),
+            ...(query.searchDescription
+                ? {
+                    description: {
+                        contains: query.searchDescription,
+                    },
+                }
+                : {}),
+            ...(query.searchEmployee
+                ? {
+                    employee: {
+                        fullName: {
+                            contains: query.searchEmployee,
+                        },
+                    },
+                }
+                : {}),
+            ...(search
+                ? {
+                    OR: [
+                        {
+                            expenseId: {
+                                contains: search,
+                            },
+                        },
+                        {
+                            description: {
+                                contains: search,
+                            },
+                        },
+                        {
+                            merchant: {
+                                contains: search,
+                            },
+                        },
+                        {
+                            department: {
+                                contains: search,
+                            },
+                        },
+                        {
+                            employee: {
+                                fullName: {
+                                    contains: search,
+                                },
+                            },
+                        },
+                    ],
+                }
+                : {}),
+            ...(query.dateFrom || query.dateTo
+                ? {
+                    expenseDate: {
+                        ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+                        ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+                    },
+                }
+                : {}),
+        };
+        const [items, total, grouped] = await Promise.all([
+            prisma_1.prisma.expense.findMany({
+                where,
+                include: {
+                    employee: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            department: true,
+                            position: true,
+                            externalRef: true,
+                        },
+                    },
+                    createdByUser: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            email: true,
+                            role: true,
+                        },
+                    },
+                    updatedByUser: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            email: true,
+                            role: true,
+                        },
+                    },
+                },
+                orderBy: {
+                    expenseDate: "desc",
+                },
+                skip,
+                take: limit,
+            }),
+            prisma_1.prisma.expense.count({ where }),
+            prisma_1.prisma.expense.groupBy({
+                by: ["status"],
+                where,
+                _count: {
+                    status: true,
+                },
+            }),
+        ]);
+        const summary = {
+            all: grouped.reduce((acc, item) => acc + item._count.status, 0),
+            pending: grouped.find((item) => item.status === "pending")?._count.status ?? 0,
+            alert: grouped.find((item) => item.status === "alert")?._count.status ?? 0,
+            high_alert: grouped.find((item) => item.status === "high_alert")?._count.status ??
+                0,
+            auto_approved: grouped.find((item) => item.status === "auto_approved")?._count
+                .status ?? 0,
+            approved: grouped.find((item) => item.status === "approved")?._count.status ?? 0,
+            rejected: grouped.find((item) => item.status === "rejected")?._count.status ?? 0,
+        };
+        const cards = {
+            highRisk: summary.high_alert,
+            needsReview: summary.alert,
+            approved: summary.approved + summary.auto_approved,
+            riskyAmount: items
+                .filter((item) => item.status === "alert" || item.status === "high_alert")
+                .reduce((acc, item) => acc + decimalToNumber(item.amountTotal), 0),
+        };
+        const tabs = {
+            needsReview: summary.alert + summary.high_alert,
+            waitingAi: summary.pending,
+            history: summary.approved + summary.auto_approved + summary.rejected,
+        };
+        const filterCounts = query.view === "history"
+            ? {
+                all: tabs.history,
+                approved: summary.approved,
+                autoApproved: summary.auto_approved,
+                rejected: summary.rejected,
+            }
+            : {
+                all: tabs.needsReview,
+                highRisk: summary.high_alert,
+                needsReview: summary.alert,
+            };
+        const departments = Array.from(new Set(items
+            .map((item) => item.department ?? item.employee.department ?? null)
+            .filter((value) => Boolean(value)))).sort((a, b) => a.localeCompare(b));
+        return {
+            items: items.map((item, index) => serializeExpense(item, skip + index + 1)),
+            meta: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+            },
+            summary,
+            cards,
+            tabs,
+            filterCounts,
+            departments,
+        };
+    }
+    static async detailTransactionForFE(companyId, id) {
+        const item = await prisma_1.prisma.expense.findFirst({
+            where: {
+                companyId,
+                OR: [{ id }, { expenseId: id }],
+            },
+            include: {
+                employee: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        department: true,
+                        position: true,
+                        externalRef: true,
+                    },
+                },
+                createdByUser: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        role: true,
+                    },
+                },
+                updatedByUser: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        role: true,
+                    },
+                },
+            },
+        });
+        if (!item) {
+            throw new app_error_1.AppError("Expense not found", 404, "EXPENSE_NOT_FOUND");
+        }
+        return serializeExpense(item);
+    }
+    static async updateTransactionStatusForFE(actor, id, input) {
+        const existing = await prisma_1.prisma.expense.findFirst({
+            where: {
+                companyId: actor.companyId,
+                OR: [{ id }, { expenseId: id }],
+            },
+        });
+        if (!existing) {
+            throw new app_error_1.AppError("Expense not found", 404, "EXPENSE_NOT_FOUND");
+        }
+        if (isReviewedStatus(existing.status)) {
+            throw new app_error_1.AppError("Expense has already been reviewed", 409, "EXPENSE_ALREADY_REVIEWED");
+        }
+        const updated = await prisma_1.prisma.expense.update({
+            where: {
+                id: existing.id,
+            },
+            data: {
+                status: input.status,
+                updatedBy: actor.userId,
+            },
+            include: {
+                employee: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        department: true,
+                        position: true,
+                        externalRef: true,
+                    },
+                },
+                createdByUser: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        role: true,
+                    },
+                },
+                updatedByUser: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        role: true,
+                    },
+                },
+            },
+        });
+        await prisma_1.prisma.auditLog.create({
+            data: {
+                companyId: actor.companyId,
+                userId: actor.userId,
+                action: `EXPENSE_${input.status.toUpperCase()}`,
+                targetType: "expense",
+                targetId: existing.id,
+                note: `Expense transaction ${input.status}`,
+                metadata: {
+                    previousStatus: existing.status,
+                    newStatus: input.status,
+                    expenseId: existing.expenseId,
+                },
+            },
+        });
+        return serializeExpense(updated);
     }
 }
 exports.ExpenseService = ExpenseService;

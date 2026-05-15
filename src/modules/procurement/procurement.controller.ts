@@ -153,6 +153,10 @@ export class ProcurementController {
         data: result.items,
         meta: result.meta,
         summary: result.summary,
+        cards: result.cards,
+        tabs: result.tabs,
+        filterCounts: result.filterCounts,
+        businessUnits: result.businessUnits,
       });
     } catch (error) {
       next(error);

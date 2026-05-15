@@ -52,6 +52,7 @@ exports.listProcurementMonitorQuerySchema = zod_1.z.object({
  * ?limit=20
  */
 exports.listProcurementTransactionsQuerySchema = zod_1.z.object({
+    view: zod_1.z.enum(["needs_review", "waiting_ai", "history"]).optional(),
     status: zod_1.z
         .string()
         .optional()
@@ -61,6 +62,7 @@ exports.listProcurementTransactionsQuerySchema = zod_1.z.object({
         return value
             .split(",")
             .map((item) => item.trim())
+            .map((item) => item.replace(/-/g, "_"))
             .filter(Boolean);
     })
         .pipe(zod_1.z.array(exports.reviewStatusEnum).optional()),

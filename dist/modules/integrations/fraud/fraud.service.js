@@ -29,6 +29,19 @@ function mapReasonsToFlagsArray(reasons = []) {
     }
     return [...flags];
 }
+function mergeFlags(...collections) {
+    const merged = new Set();
+    for (const collection of collections) {
+        if (!collection)
+            continue;
+        for (const item of collection) {
+            if (!item)
+                continue;
+            merged.add(String(item));
+        }
+    }
+    return [...merged];
+}
 function riskLevelToStatus(riskLevel) {
     switch (riskLevel) {
         case "HIGH":
@@ -48,6 +61,30 @@ function getFraudScore(input) {
         input.scores?.fraudScore ??
         input.scores?.ensemble ??
         null);
+}
+function keepHigherFraudScore(currentScore, nextScore) {
+    if (currentScore === null || currentScore === undefined)
+        return nextScore;
+    if (nextScore === null || nextScore === undefined)
+        return currentScore;
+    return Math.max(currentScore, nextScore);
+}
+function statusSeverity(status) {
+    const map = {
+        pending: 1,
+        alert: 2,
+        high_alert: 3,
+        auto_approved: 0,
+    };
+    return map[status];
+}
+function keepHigherRiskStatus(currentStatus, nextStatus) {
+    if (currentStatus === "approved" || currentStatus === "rejected") {
+        return currentStatus;
+    }
+    return statusSeverity(currentStatus) >= statusSeverity(nextStatus)
+        ? currentStatus
+        : nextStatus;
 }
 class FraudIntegrationService {
     static async insertSingle(input) {
@@ -94,9 +131,9 @@ class FraudIntegrationService {
             await prisma_1.prisma.expense.update({
                 where: { id: expense.id },
                 data: {
-                    status: mappedStatus,
-                    fraudScore,
-                    flags,
+                    status: keepHigherRiskStatus(expense.status, mappedStatus),
+                    fraudScore: keepHigherFraudScore(expense.fraudScore, fraudScore),
+                    flags: mergeFlags(expense.flags, flags),
                     aiExplanation,
                 },
             });
@@ -135,9 +172,9 @@ class FraudIntegrationService {
         await prisma_1.prisma.procurementTransaction.update({
             where: { id: procurement.id },
             data: {
-                status: mappedStatus,
-                fraudScore,
-                flags,
+                status: keepHigherRiskStatus(procurement.status, mappedStatus),
+                fraudScore: keepHigherFraudScore(procurement.fraudScore, fraudScore),
+                flags: mergeFlags(procurement.flags, flags),
                 aiExplanation,
             },
         });

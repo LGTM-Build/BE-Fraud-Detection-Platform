@@ -12,6 +12,8 @@ const prisma_1 = require("../../lib/prisma");
 const app_error_1 = require("../../core/errors/app-error");
 const fraud_dispatch_service_1 = require("../integrations/fraud/fraud-dispatch.service");
 const business_id_1 = require("../../core/utils/business-id");
+const vendor_service_1 = require("../vendors/vendor.service");
+const procurement_service_1 = require("../procurement/procurement.service");
 function normalizeHeader(value) {
     return String(value)
         .replace(/^\uFEFF/, "")
@@ -225,6 +227,15 @@ class ImportService {
                     employeeId = employee.id;
                 }
                 const purchaseId = row.purchaseId || (await (0, business_id_1.generatePurchaseId)(actor.companyId));
+                const vendorResult = await vendor_service_1.VendorService.ensureVendor(actor, {
+                    vendorName: row.vendorName,
+                    metadata: {
+                        source: "procurement_import",
+                    },
+                });
+                const vendorRisk = procurement_service_1.ProcurementService.getVendorRiskForProcurement(vendorResult.vendor.status);
+                const initialFlags = procurement_service_1.ProcurementService.mergeFlags(null, vendorRisk.flags);
+                const initialStatus = procurement_service_1.ProcurementService.maxStatus("pending", vendorRisk.status);
                 const created = await prisma_1.prisma.procurementTransaction.create({
                     data: {
                         companyId: actor.companyId,
@@ -236,6 +247,14 @@ class ImportService {
                         department: row.department || null,
                         amountTotal,
                         procurementMethod: normalizeProcurementMethod(row.procurementMethod),
+                        flags: initialFlags,
+                        status: initialStatus,
+                        fraudScore: vendorRisk.fraudScore,
+                        aiExplanation: vendorResult.vendor.status === "blacklisted"
+                            ? "Vendor berada dalam daftar blacklist dan otomatis ditandai berisiko tinggi."
+                            : vendorResult.vendor.status === "inactive"
+                                ? "Vendor berstatus nonaktif sehingga transaksi perlu ditinjau."
+                                : null,
                         createdBy: actor.userId,
                         updatedBy: actor.userId,
                     },

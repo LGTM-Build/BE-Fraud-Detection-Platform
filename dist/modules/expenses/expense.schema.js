@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listExpenseMonitorQuerySchema = exports.reviewExpenseSchema = exports.updateExpenseSchema = exports.createExpenseSchema = void 0;
+exports.updateExpenseStatusSchema = exports.listExpenseTransactionsQuerySchema = exports.listExpenseMonitorQuerySchema = exports.reviewExpenseSchema = exports.updateExpenseSchema = exports.createExpenseSchema = void 0;
 const zod_1 = require("zod");
 const reviewStatusEnum = zod_1.z.enum([
     "pending",
@@ -43,4 +43,31 @@ exports.listExpenseMonitorQuerySchema = zod_1.z.object({
     dateTo: zod_1.z.string().optional(),
     page: zod_1.z.coerce.number().int().min(1).optional(),
     limit: zod_1.z.coerce.number().int().min(1).max(100).optional(),
+});
+exports.listExpenseTransactionsQuerySchema = zod_1.z.object({
+    view: zod_1.z.enum(["needs_review", "waiting_ai", "history"]).optional(),
+    status: zod_1.z
+        .string()
+        .optional()
+        .transform((value) => {
+        if (!value)
+            return undefined;
+        return value
+            .split(",")
+            .map((item) => item.trim())
+            .map((item) => item.replace(/-/g, "_"))
+            .filter(Boolean);
+    })
+        .pipe(zod_1.z.array(reviewStatusEnum).optional()),
+    department: zod_1.z.string().optional(),
+    search: zod_1.z.string().optional(),
+    searchEmployee: zod_1.z.string().optional(),
+    searchDescription: zod_1.z.string().optional(),
+    dateFrom: zod_1.z.string().optional(),
+    dateTo: zod_1.z.string().optional(),
+    page: zod_1.z.coerce.number().int().min(1).optional(),
+    limit: zod_1.z.coerce.number().int().min(1).max(100).optional(),
+});
+exports.updateExpenseStatusSchema = zod_1.z.object({
+    status: zod_1.z.enum(["approved", "rejected"]),
 });

@@ -47,3 +47,34 @@ export const listExpenseMonitorQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
+
+export const listExpenseTransactionsQuerySchema = z.object({
+  view: z.enum(["needs_review", "waiting_ai", "history"]).optional(),
+
+  status: z
+    .string()
+    .optional()
+    .transform((value) => {
+      if (!value) return undefined;
+
+      return value
+        .split(",")
+        .map((item) => item.trim())
+        .map((item) => item.replace(/-/g, "_"))
+        .filter(Boolean);
+    })
+    .pipe(z.array(reviewStatusEnum).optional()),
+
+  department: z.string().optional(),
+  search: z.string().optional(),
+  searchEmployee: z.string().optional(),
+  searchDescription: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export const updateExpenseStatusSchema = z.object({
+  status: z.enum(["approved", "rejected"]),
+});

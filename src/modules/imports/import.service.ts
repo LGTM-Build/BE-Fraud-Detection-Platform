@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import xlsx from "xlsx";
 import { parse } from "csv-parse/sync";
+import { ReviewStatus } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../core/errors/app-error";
 import { FraudDispatchService } from "../integrations/fraud/fraud-dispatch.service";
@@ -9,6 +10,8 @@ import {
   generateExpenseId,
   generatePurchaseId,
 } from "../../core/utils/business-id";
+import { VendorService } from "../vendors/vendor.service";
+import { ProcurementService } from "../procurement/procurement.service";
 
 type Actor = {
   userId: string;
@@ -416,6 +419,24 @@ export class ImportService {
         const purchaseId =
           row.purchaseId || (await generatePurchaseId(actor.companyId));
 
+        const vendorResult = await VendorService.ensureVendor(actor, {
+          vendorName: row.vendorName,
+          metadata: {
+            source: "procurement_import",
+          },
+        });
+        const vendorRisk = ProcurementService.getVendorRiskForProcurement(
+          vendorResult.vendor.status,
+        );
+        const initialFlags = ProcurementService.mergeFlags(
+          null,
+          vendorRisk.flags,
+        );
+        const initialStatus = ProcurementService.maxStatus(
+          "pending" as ReviewStatus,
+          vendorRisk.status,
+        );
+
         const created = await prisma.procurementTransaction.create({
           data: {
             companyId: actor.companyId,
@@ -429,6 +450,15 @@ export class ImportService {
             procurementMethod: normalizeProcurementMethod(
               row.procurementMethod,
             ),
+            flags: initialFlags,
+            status: initialStatus,
+            fraudScore: vendorRisk.fraudScore,
+            aiExplanation:
+              vendorResult.vendor.status === "blacklisted"
+                ? "Vendor berada dalam daftar blacklist dan otomatis ditandai berisiko tinggi."
+                : vendorResult.vendor.status === "inactive"
+                  ? "Vendor berstatus nonaktif sehingga transaksi perlu ditinjau."
+                  : null,
             createdBy: actor.userId,
             updatedBy: actor.userId,
           },

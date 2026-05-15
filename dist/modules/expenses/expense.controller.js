@@ -70,5 +70,58 @@ class ExpenseController {
             next(error);
         }
     }
+    static async listTransactions(req, res, next) {
+        try {
+            if (!req.auth)
+                throw new app_error_1.AppError("Unauthorized", 401, "UNAUTHORIZED");
+            const parsed = expense_schema_1.listExpenseTransactionsQuerySchema.parse(req.query);
+            const result = await expense_service_1.ExpenseService.listTransactionsForFE(req.auth.companyId, parsed);
+            return res.status(200).json({
+                success: true,
+                message: "Expense transactions fetched successfully",
+                data: result.items,
+                meta: result.meta,
+                summary: result.summary,
+                cards: result.cards,
+                tabs: result.tabs,
+                filterCounts: result.filterCounts,
+                departments: result.departments,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    static async detailTransaction(req, res, next) {
+        try {
+            if (!req.auth)
+                throw new app_error_1.AppError("Unauthorized", 401, "UNAUTHORIZED");
+            const result = await expense_service_1.ExpenseService.detailTransactionForFE(req.auth.companyId, req.params.id);
+            return res.status(200).json({
+                success: true,
+                message: "Expense transaction fetched successfully",
+                data: result,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    static async updateTransactionStatus(req, res, next) {
+        try {
+            if (!req.auth)
+                throw new app_error_1.AppError("Unauthorized", 401, "UNAUTHORIZED");
+            const parsed = expense_schema_1.updateExpenseStatusSchema.parse(req.body);
+            const result = await expense_service_1.ExpenseService.updateTransactionStatusForFE({ userId: req.auth.userId, companyId: req.auth.companyId }, req.params.id, parsed);
+            return res.status(200).json({
+                success: true,
+                message: "Expense transaction status updated successfully",
+                data: result,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
 }
 exports.ExpenseController = ExpenseController;

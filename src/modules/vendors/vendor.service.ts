@@ -2,7 +2,73 @@ import { prisma } from "../../lib/prisma";
 import { AppError } from "../../core/errors/app-error";
 import { AuditLogService } from "../audit-logs/audit-log.service";
 
+function normalizeVendorName(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
 export class VendorService {
+  static async findByName(companyId: string, vendorName: string) {
+    return prisma.vendor.findFirst({
+      where: {
+        companyId,
+        vendorName: normalizeVendorName(vendorName),
+      },
+    });
+  }
+
+  static async ensureVendor(
+    actor: { userId: string; companyId: string },
+    input: {
+      vendorName: string;
+      metadata?: unknown;
+      status?: "active" | "inactive" | "blacklisted";
+    },
+  ) {
+    const normalizedVendorName = normalizeVendorName(input.vendorName);
+
+    const existing = await prisma.vendor.findFirst({
+      where: {
+        companyId: actor.companyId,
+        vendorName: normalizedVendorName,
+      },
+    });
+
+    if (existing) {
+      return {
+        vendor: existing,
+        created: false,
+      };
+    }
+
+    const vendor = await prisma.vendor.create({
+      data: {
+        companyId: actor.companyId,
+        vendorName: normalizedVendorName,
+        metadata: input.metadata as any,
+        status: input.status ?? "active",
+      },
+    });
+
+    await AuditLogService.create({
+      companyId: actor.companyId,
+      userId: actor.userId,
+      action: "create_vendor",
+      targetType: "vendor",
+      targetId: vendor.id,
+      note: "Created vendor",
+      metadata: {
+        vendorName: vendor.vendorName,
+        status: vendor.status,
+        source: "auto_or_manual",
+      },
+    });
+
+    return {
+      vendor,
+      created: true,
+    };
+  }
+
   static async list(companyId: string) {
     return prisma.vendor.findMany({
       where: { companyId },
@@ -30,12 +96,8 @@ export class VendorService {
       status?: "active" | "inactive" | "blacklisted";
     },
   ) {
-    const existing = await prisma.vendor.findFirst({
-      where: {
-        companyId: actor.companyId,
-        vendorName: input.vendorName,
-      },
-    });
+    const normalizedVendorName = normalizeVendorName(input.vendorName);
+    const existing = await this.findByName(actor.companyId, normalizedVendorName);
 
     if (existing) {
       throw new AppError("Vendor already exists", 409, "VENDOR_ALREADY_EXISTS");
@@ -44,7 +106,7 @@ export class VendorService {
     const vendor = await prisma.vendor.create({
       data: {
         companyId: actor.companyId,
-        vendorName: input.vendorName,
+        vendorName: normalizedVendorName,
         metadata: input.metadata as any,
         status: input.status ?? "active",
       },
@@ -84,10 +146,11 @@ export class VendorService {
     }
 
     if (input.vendorName && input.vendorName !== existing.vendorName) {
+      const normalizedVendorName = normalizeVendorName(input.vendorName);
       const duplicate = await prisma.vendor.findFirst({
         where: {
           companyId: actor.companyId,
-          vendorName: input.vendorName,
+          vendorName: normalizedVendorName,
           NOT: {
             id: existing.id,
           },
@@ -106,7 +169,9 @@ export class VendorService {
     const updated = await prisma.vendor.update({
       where: { id: existing.id },
       data: {
-        vendorName: input.vendorName ?? existing.vendorName,
+        vendorName: input.vendorName
+          ? normalizeVendorName(input.vendorName)
+          : existing.vendorName,
         metadata:
           input.metadata === undefined
             ? existing.metadata
