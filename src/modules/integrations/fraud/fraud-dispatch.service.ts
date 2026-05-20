@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { AppError } from "../../../core/errors/app-error";
 import {
   FraudClient,
+  FraudBatchPayload,
   FraudHistorySummaryPayload,
 } from "./fraud.client";
 
@@ -67,7 +68,97 @@ function buildStatsSummary(
   };
 }
 
+function chunkArray<T>(items: T[], chunkSize: number) {
+  const normalizedChunkSize = Math.max(1, chunkSize);
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < items.length; index += normalizedChunkSize) {
+    chunks.push(items.slice(index, index + normalizedChunkSize));
+  }
+
+  return chunks;
+}
+
 export class FraudDispatchService {
+  private static async createPendingProcurementAnalysisResults(
+    companyId: string,
+    procurementIds: string[],
+  ) {
+    const requestedAt = new Date();
+
+    await prisma.fraudAnalysisResult.createMany({
+      data: procurementIds.map((procurementId) => ({
+        companyId,
+        procurementId,
+        analysisType: "anomaly",
+        status: "pending",
+        requestedAt,
+      })),
+    });
+
+    return requestedAt;
+  }
+
+  private static async createPendingExpenseAnalysisResults(
+    companyId: string,
+    expenseIds: string[],
+  ) {
+    const requestedAt = new Date();
+
+    await prisma.fraudAnalysisResult.createMany({
+      data: expenseIds.map((expenseId) => ({
+        companyId,
+        expenseId,
+        analysisType: "anomaly",
+        status: "pending",
+        requestedAt,
+      })),
+    });
+
+    return requestedAt;
+  }
+
+  private static async submitPayloadInChunks<T extends FraudBatchPayload>(
+    payload: T,
+  ) {
+    const recordChunks = chunkArray(
+      payload.records as Array<T["records"][number]>,
+      env.PYTHON_FRAUD_BATCH_CHUNK_SIZE,
+    );
+    const responses: Array<{
+      chunkIndex: number;
+      chunkSize: number;
+      response: unknown;
+    }> = [];
+
+    for (const [index, records] of recordChunks.entries()) {
+      const chunkPayload = {
+        ...payload,
+        records,
+        metadata: {
+          ...payload.metadata,
+          chunkIndex: index,
+          chunkCount: recordChunks.length,
+          callbackMode: env.PYTHON_FRAUD_CALLBACK_MODE,
+          historySource: env.FRAUD_HISTORY_SOURCE,
+        },
+      };
+
+      const response = await FraudClient.submitBatch(chunkPayload as T);
+
+      responses.push({
+        chunkIndex: index,
+        chunkSize: records.length,
+        response,
+      });
+    }
+
+    return {
+      chunkCount: recordChunks.length,
+      responses,
+    };
+  }
+
   private static async buildProcurementHistorySummaries(
     companyId: string,
     procurements: Array<{
@@ -254,10 +345,16 @@ export class FraudDispatchService {
         source,
         companyId: actor.companyId,
         requestedBy: actor.userId,
+        historySource: env.FRAUD_HISTORY_SOURCE,
+        callbackMode: env.PYTHON_FRAUD_CALLBACK_MODE,
       },
     };
 
-    const pythonResponse = await FraudClient.submitBatch(payload);
+    const requestedAt = await this.createPendingProcurementAnalysisResults(
+      actor.companyId,
+      procurements.map((item) => item.id),
+    );
+    const pythonResponse = await this.submitPayloadInChunks(payload);
 
     await prisma.auditLog.create({
       data: {
@@ -270,7 +367,11 @@ export class FraudDispatchService {
         metadata: {
           source,
           procurementIds,
-          pythonResponse,
+          requestedAt,
+          historySource: env.FRAUD_HISTORY_SOURCE,
+          callbackMode: env.PYTHON_FRAUD_CALLBACK_MODE,
+          chunkSize: env.PYTHON_FRAUD_BATCH_CHUNK_SIZE,
+          pythonResponseText: JSON.stringify(pythonResponse),
         },
       },
     });
@@ -338,10 +439,16 @@ export class FraudDispatchService {
         source,
         companyId: actor.companyId,
         requestedBy: actor.userId,
+        historySource: env.FRAUD_HISTORY_SOURCE,
+        callbackMode: env.PYTHON_FRAUD_CALLBACK_MODE,
       },
     };
 
-    const pythonResponse = await FraudClient.submitBatch(payload);
+    const requestedAt = await this.createPendingExpenseAnalysisResults(
+      actor.companyId,
+      expenses.map((item) => item.id),
+    );
+    const pythonResponse = await this.submitPayloadInChunks(payload);
 
     await prisma.auditLog.create({
       data: {
@@ -354,7 +461,11 @@ export class FraudDispatchService {
         metadata: {
           source,
           expenseIds,
-          pythonResponse,
+          requestedAt,
+          historySource: env.FRAUD_HISTORY_SOURCE,
+          callbackMode: env.PYTHON_FRAUD_CALLBACK_MODE,
+          chunkSize: env.PYTHON_FRAUD_BATCH_CHUNK_SIZE,
+          pythonResponseText: JSON.stringify(pythonResponse),
         },
       },
     });

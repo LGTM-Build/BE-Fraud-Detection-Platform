@@ -110,6 +110,20 @@ function buildFeatureSnapshot(input: CallbackItem) {
   };
 }
 
+function buildCompletedAnalysisData(input: CallbackItem, completedAt: Date) {
+  return {
+    analysisType: DEFAULT_ANALYSIS_TYPE,
+    status: "completed" as const,
+    isFraud: input.predictedFraud ?? null,
+    fraudScore: getFraudScore(input),
+    flags: mapReasonsToFlagsArray(input.reasons ?? []),
+    aiExplanation: input.aiExplanation ?? input.reasons?.join(". ") ?? null,
+    features: buildFeatureSnapshot(input),
+    rawResponse: input.raw ?? input,
+    completedAt,
+  };
+}
+
 function mergeFlags(...collections: Array<string[] | null | undefined>) {
   const merged = new Set<string>();
 
@@ -224,14 +238,13 @@ export class FraudIntegrationService {
       input.module ??
       (input.expenseId || input.expenseDbId ? "expense" : "procurement");
 
-    const fraudScore = getFraudScore(input);
-    const flags = mapReasonsToFlagsArray(input.reasons ?? []);
-    const aiExplanation =
-      input.aiExplanation ?? input.reasons?.join(". ") ?? null;
-    const mappedStatus = riskLevelToStatus(input.riskLevel);
-    const completedAt = input.generatedAt
+    const completedData = buildCompletedAnalysisData(input, input.generatedAt
       ? new Date(input.generatedAt)
-      : new Date();
+      : new Date());
+    const fraudScore = completedData.fraudScore;
+    const flags = completedData.flags;
+    const aiExplanation = completedData.aiExplanation;
+    const mappedStatus = riskLevelToStatus(input.riskLevel);
 
     if (module === "expense") {
       const expense = await prisma.expense.findFirst({
@@ -248,21 +261,33 @@ export class FraudIntegrationService {
         throw new AppError("Expense not found", 404, "EXPENSE_NOT_FOUND");
       }
 
-      const result = await prisma.fraudAnalysisResult.create({
-        data: {
+      const existingResult = await prisma.fraudAnalysisResult.findFirst({
+        where: {
           companyId: expense.companyId,
           expenseId: expense.id,
           analysisType: DEFAULT_ANALYSIS_TYPE,
-          status: "completed",
-          isFraud: input.predictedFraud ?? null,
-          fraudScore,
-          flags,
-          aiExplanation,
-          features: buildFeatureSnapshot(input),
-          rawResponse: input.raw ?? input,
-          completedAt,
+          status: {
+            in: ["pending", "processing"],
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
         },
       });
+
+      const result = existingResult
+        ? await prisma.fraudAnalysisResult.update({
+            where: { id: existingResult.id },
+            data: completedData,
+          })
+        : await prisma.fraudAnalysisResult.create({
+            data: {
+              companyId: expense.companyId,
+              expenseId: expense.id,
+              requestedAt: completedData.completedAt,
+              ...completedData,
+            },
+          });
 
       await prisma.expense.update({
         where: { id: expense.id },
@@ -291,21 +316,33 @@ export class FraudIntegrationService {
       throw new AppError("Procurement not found", 404, "PROCUREMENT_NOT_FOUND");
     }
 
-    const result = await prisma.fraudAnalysisResult.create({
-      data: {
+    const existingResult = await prisma.fraudAnalysisResult.findFirst({
+      where: {
         companyId: procurement.companyId,
         procurementId: procurement.id,
         analysisType: DEFAULT_ANALYSIS_TYPE,
-        status: "completed",
-        isFraud: input.predictedFraud ?? null,
-        fraudScore,
-        flags,
-        aiExplanation,
-        features: buildFeatureSnapshot(input),
-        rawResponse: input.raw ?? input,
-        completedAt,
+        status: {
+          in: ["pending", "processing"],
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
       },
     });
+
+    const result = existingResult
+      ? await prisma.fraudAnalysisResult.update({
+          where: { id: existingResult.id },
+          data: completedData,
+        })
+      : await prisma.fraudAnalysisResult.create({
+          data: {
+            companyId: procurement.companyId,
+            procurementId: procurement.id,
+            requestedAt: completedData.completedAt,
+            ...completedData,
+          },
+        });
 
     await prisma.procurementTransaction.update({
       where: { id: procurement.id },

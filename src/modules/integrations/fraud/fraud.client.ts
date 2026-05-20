@@ -39,6 +39,16 @@ export type FraudHistorySummaryPayload = {
   source: "backend_db";
 };
 
+export type FraudBatchMetadata = {
+  source: "import" | "manual";
+  companyId: string;
+  requestedBy: string;
+  historySource?: string;
+  callbackMode?: string;
+  chunkIndex?: number;
+  chunkCount?: number;
+};
+
 export type FraudBatchPayload =
   | {
       module: "procurement";
@@ -47,11 +57,7 @@ export type FraudBatchPayload =
         "x-internal-api-key": string;
       };
       records: FraudProcurementRecordPayload[];
-      metadata: {
-        source: "import" | "manual";
-        companyId: string;
-        requestedBy: string;
-      };
+      metadata: FraudBatchMetadata;
     }
   | {
       module: "expense";
@@ -60,11 +66,7 @@ export type FraudBatchPayload =
         "x-internal-api-key": string;
       };
       records: FraudExpenseRecordPayload[];
-      metadata: {
-        source: "import" | "manual";
-        companyId: string;
-        requestedBy: string;
-      };
+      metadata: FraudBatchMetadata;
     };
 
 export class FraudClient {
