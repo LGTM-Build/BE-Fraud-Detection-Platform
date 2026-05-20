@@ -1,26 +1,113 @@
 import { prisma } from "../../../lib/prisma";
 import { AppError } from "../../../core/errors/app-error";
 
-const DEFAULT_ANALYSIS_TYPE = "supervised" as const;
+const DEFAULT_ANALYSIS_TYPE = "anomaly" as const;
+
+function normalizeText(value: string) {
+  return value.toLowerCase().trim();
+}
 
 function mapReasonsToFlagsArray(reasons: string[] = []) {
   const flags = new Set<string>();
 
   for (const reason of reasons) {
-    const lower = reason.toLowerCase();
+    const lower = normalizeText(reason);
 
-    if (lower.includes("duplicate")) flags.add("Duplicate Invoice");
-    if (lower.includes("self approval")) flags.add("Self Approval");
-    if (lower.includes("vendor")) flags.add("Vendor Risk");
-    if (lower.includes("markup")) flags.add("Price Markup");
-    if (lower.includes("shell")) flags.add("Shell Company");
-    if (lower.includes("inflated")) flags.add("Inflated Amount");
-    if (lower.includes("weekend")) flags.add("Weekend Claim");
-    if (lower.includes("entertainment")) flags.add("Entertainment Abuse");
-    if (lower.includes("split")) flags.add("Split Transaction");
+    if (
+      lower.includes("duplicate") ||
+      lower.includes("duplikat") ||
+      lower.includes("invoice muncul")
+    ) {
+      flags.add("Duplicate Invoice");
+    }
+
+    if (
+      lower.includes("self approval") ||
+      lower.includes("persetujuan sendiri")
+    ) {
+      flags.add("Self Approval");
+    }
+
+    if (
+      lower.includes("vendor") ||
+      lower.includes("vendor baru") ||
+      lower.includes("vendor sangat baru")
+    ) {
+      flags.add("Vendor Risk");
+    }
+
+    if (lower.includes("markup")) {
+      flags.add("Price Markup");
+    }
+
+    if (
+      lower.includes("shell") ||
+      lower.includes("perusahaan cangkang")
+    ) {
+      flags.add("Shell Company");
+    }
+
+    if (
+      lower.includes("inflated") ||
+      lower.includes("nominal jauh di atas") ||
+      lower.includes("di atas median") ||
+      lower.includes("abnormal amount")
+    ) {
+      flags.add("Inflated Amount");
+    }
+
+    if (
+      lower.includes("weekend") ||
+      lower.includes("akhir pekan")
+    ) {
+      flags.add("Weekend Claim");
+    }
+
+    if (
+      lower.includes("entertainment") ||
+      lower.includes("hiburan")
+    ) {
+      flags.add("Entertainment Abuse");
+    }
+
+    if (
+      lower.includes("split") ||
+      lower.includes("burst") ||
+      lower.includes("dipecah")
+    ) {
+      flags.add("Split Transaction");
+    }
   }
 
   return [...flags];
+}
+
+function extractRawObject(raw: unknown) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+
+  return raw as Record<string, unknown>;
+}
+
+function extractHistorySummary(raw: unknown) {
+  const rawObject = extractRawObject(raw);
+  const sourceRecord = extractRawObject(rawObject?.sourceRecord);
+  const historySummary = sourceRecord?.historySummary;
+
+  if (!historySummary || typeof historySummary !== "object") {
+    return null;
+  }
+
+  return historySummary;
+}
+
+function buildFeatureSnapshot(input: CallbackItem) {
+  return {
+    reasons: input.reasons ?? [],
+    riskLevel: input.riskLevel ?? null,
+    historySummary: extractHistorySummary(input.raw),
+  };
 }
 
 function mergeFlags(...collections: Array<string[] | null | undefined>) {
@@ -171,10 +258,7 @@ export class FraudIntegrationService {
           fraudScore,
           flags,
           aiExplanation,
-          features: {
-            reasons: input.reasons ?? [],
-            riskLevel: input.riskLevel ?? null,
-          },
+          features: buildFeatureSnapshot(input),
           rawResponse: input.raw ?? input,
           completedAt,
         },
@@ -217,10 +301,7 @@ export class FraudIntegrationService {
         fraudScore,
         flags,
         aiExplanation,
-        features: {
-          reasons: input.reasons ?? [],
-          riskLevel: input.riskLevel ?? null,
-        },
+        features: buildFeatureSnapshot(input),
         rawResponse: input.raw ?? input,
         completedAt,
       },
@@ -242,6 +323,11 @@ export class FraudIntegrationService {
   static async insertBatch(input: {
     module?: "procurement" | "expense";
     generatedAt?: string;
+    jobId?: string;
+    chunkIndex?: number;
+    chunkCount?: number;
+    isFinalChunk?: boolean;
+    historySource?: string;
     results?: CallbackItem[];
     samplePredictions?: CallbackItem[];
   }) {
@@ -280,6 +366,11 @@ export class FraudIntegrationService {
     }
 
     return {
+      jobId: input.jobId ?? null,
+      chunkIndex: input.chunkIndex ?? null,
+      chunkCount: input.chunkCount ?? null,
+      isFinalChunk: input.isFinalChunk ?? null,
+      historySource: input.historySource ?? null,
       totalRows: rows.length,
       successRows: successes.length,
       failedRows: errors.length,

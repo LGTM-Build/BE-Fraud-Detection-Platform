@@ -31,6 +31,11 @@ export const insertFraudResultSchema = callbackResultSchema;
 
 export const insertFraudResultsBatchSchema = z.object({
   module: z.enum(["procurement", "expense"]).optional(),
+  jobId: z.string().min(1).optional(),
+  chunkIndex: z.number().int().nonnegative().optional(),
+  chunkCount: z.number().int().positive().optional(),
+  isFinalChunk: z.boolean().optional(),
+  historySource: z.string().min(1).optional(),
   generatedAt: z.string().datetime().optional(),
   results: z.array(callbackResultSchema).optional(),
   samplePredictions: z.array(callbackResultSchema).optional(),
