@@ -12,6 +12,7 @@ export type FraudProcurementRecordPayload = {
   amountTotal: number;
   procurementMethod: string;
   employeeExternalRef: string | null;
+  historySummary?: FraudHistorySummaryPayload | null;
 };
 
 export type FraudExpenseRecordPayload = {
@@ -24,6 +25,18 @@ export type FraudExpenseRecordPayload = {
   amountTotal: number;
   category: string;
   merchant: string | null;
+  historySummary?: FraudHistorySummaryPayload | null;
+};
+
+export type FraudHistorySummaryPayload = {
+  scope: "vendor" | "employee";
+  transactionCount: number;
+  amountMean: number | null;
+  amountMedian: number | null;
+  amountStd: number | null;
+  duplicateReferenceCount?: number;
+  historyReady: boolean;
+  source: "backend_db";
 };
 
 export type FraudBatchPayload =
